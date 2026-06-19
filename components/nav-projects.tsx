@@ -14,12 +14,16 @@ import {
 export function NavProjects({
   projects,
   projectHref,
+  recentLabel = "Недавние проекты",
+  listAllLabel = "Все проекты",
 }: {
   projects: {
     id: string;
     name: string;
   }[];
   projectHref: (projectId: string) => string;
+  recentLabel?: string;
+  listAllLabel?: string;
 }) {
   if (projects.length === 0) {
     return null;
@@ -27,7 +31,7 @@ export function NavProjects({
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Недавние проекты</SidebarGroupLabel>
+      <SidebarGroupLabel>{recentLabel}</SidebarGroupLabel>
       <SidebarMenu>
         {projects.map((project) => (
           <SidebarMenuItem key={project.id}>
@@ -43,7 +47,7 @@ export function NavProjects({
           <SidebarMenuButton asChild className="text-sidebar-foreground/70">
             <Link href="/">
               <IconDots className="text-sidebar-foreground/70" />
-              <span>Все проекты</span>
+              <span>{listAllLabel}</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

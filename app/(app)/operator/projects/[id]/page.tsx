@@ -46,7 +46,6 @@ export default async function OperatorProjectPage({
       }
     >
       <PanelWorkspace
-        mode="operator"
         projectId={project.id}
         panels={serializePanelsForClient(project.panels)}
         sheetContext={serializeSheetContext(project)}

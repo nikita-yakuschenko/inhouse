@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalculatePanelButton } from "@/components/cut-plan/calculate-panel-button";
 import { OperationsSheet } from "@/components/cut-plan/operations-sheet";
 import { SheetTabsPanel } from "@/components/cut-plan/sheet-tabs-panel";
 import { PartsPanel } from "@/components/parts/parts-panel";
@@ -21,16 +20,13 @@ import {
 import { getSheetIndicesForPart } from "@/lib/cut-plan/sheet-part-groups";
 import { Badge } from "@/components/ui/badge";
 
-export type WorkspaceMode = "operator" | "estimator";
-
+/** Рабочее место оператора: карта + пошаговые операции на станке. */
 export function PanelWorkspace({
-  mode,
   projectId,
   panels,
   sheetContext,
   initialSheetParam = null,
 }: {
-  mode: WorkspaceMode;
   projectId: string;
   panels: ClientPanel[];
   sheetContext: ClientSheetContext | null;
@@ -46,7 +42,6 @@ export function PanelWorkspace({
         }
       >
         <PanelWorkspaceInner
-          mode={mode}
           projectId={projectId}
           panels={panels}
           sheetContext={sheetContext}
@@ -58,19 +53,16 @@ export function PanelWorkspace({
 }
 
 function PanelWorkspaceInner({
-  mode,
-  projectId,
+  projectId: _projectId,
   panels,
   sheetContext,
   initialSheetParam,
 }: {
-  mode: WorkspaceMode;
   projectId: string;
   panels: ClientPanel[];
   sheetContext: ClientSheetContext | null;
   initialSheetParam: string | null;
 }) {
-  const isEstimator = mode === "estimator";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -185,14 +177,10 @@ function PanelWorkspaceInner({
             </Badge>
           </>
         ) : (
-          <Badge variant="outline">
-            {isEstimator ? "Расчёт не выполнен" : "Задание не готово"}
-          </Badge>
+          <Badge variant="outline">Задание не готово</Badge>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {isEstimator ? (
-            <CalculatePanelButton projectId={projectId} panelId={activePanel.id} />
-          ) : cutPlan ? (
+          {cutPlan ? (
             <OperationsSheet steps={sheetWorkflowSteps} context={operationsSheetContext} />
           ) : null}
         </div>
@@ -201,9 +189,7 @@ function PanelWorkspaceInner({
       <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 lg:flex-row lg:gap-3 lg:p-3">
         <aside className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:w-[300px]">
           <PanelBlockHeader>
-            <h2 className="text-sm font-medium">
-              {isEstimator ? "Детали панели" : "Детали в задании"}
-            </h2>
+            <h2 className="text-sm font-medium">Детали в задании</h2>
           </PanelBlockHeader>
           <div className="min-h-0 flex-1 overflow-auto">
             <PartsPanel
@@ -217,9 +203,7 @@ function PanelWorkspaceInner({
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {!activeSheet ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-              {isEstimator
-                ? "Выполните расчёт раскроя для этой панели"
-                : "Сменное задание для этой панели ещё не загружено"}
+              Сменное задание для этой панели ещё не загружено
             </div>
           ) : (
             <SheetTabsPanel

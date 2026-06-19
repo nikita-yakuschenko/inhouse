@@ -1,45 +1,29 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppPage } from "@/components/app-page";
+import { EstimatorCalculationsTable } from "@/components/projects/estimator-calculations-table";
+import { NewCalculationSheet } from "@/components/projects/new-calculation-sheet";
 import { SiteHeader } from "@/components/site-header";
-import { CreateProjectForm } from "@/components/projects/create-project-form";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCatalogDefaults, getProjects } from "@/features/projects/queries";
+import { serializeProjectListRows } from "@/features/projects/serialize-project-list";
 import { getAppRole } from "@/lib/auth/session";
+import { getWorkspaceLabels } from "@/lib/auth/workspace-labels";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function EstimatorHomePage() {
   const role = await getAppRole();
   if (role === "operator") {
     redirect("/operator");
   }
 
+  const labels = getWorkspaceLabels("estimator");
   const [projects, catalog] = await Promise.all([getProjects(), getCatalogDefaults()]);
+  const rows = serializeProjectListRows(projects);
 
   const totalPanels = projects.reduce((sum, project) => sum + project.panels.length, 0);
-  const calculatedPanels = projects.reduce(
-    (sum, project) =>
-      sum +
-      project.panels.filter((panel) => panel.cutPlans.length > 0).length,
-    0,
-  );
+  const totalParts = rows.reduce((sum, row) => sum + row.partsQuantity, 0);
 
   return (
     <AppPage
@@ -47,8 +31,16 @@ export default async function HomePage() {
         <SiteHeader
           breadcrumbs={[
             { label: "Smartcut", href: "/" },
-            { label: "Проекты" },
+            { label: labels.section },
           ]}
+          actions={
+            <NewCalculationSheet
+              labels={labels}
+              materials={catalog.materials}
+              sheetFormats={catalog.sheetFormats}
+              machineProfiles={catalog.machineProfiles}
+            />
+          }
         />
       }
     >
@@ -58,7 +50,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-3">
               <Card>
                 <CardHeader>
-                  <CardDescription>Проектов</CardDescription>
+                  <CardDescription>Расчётов</CardDescription>
                   <CardTitle className="text-2xl font-semibold tabular-nums">
                     {projects.length}
                   </CardTitle>
@@ -74,95 +66,26 @@ export default async function HomePage() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardDescription>С расчётом</CardDescription>
+                  <CardDescription>Деталей</CardDescription>
                   <CardTitle className="text-2xl font-semibold tabular-nums">
-                    {calculatedPanels}
+                    {totalParts}
                   </CardTitle>
                 </CardHeader>
               </Card>
             </div>
 
-            <div className="grid gap-6 px-4 lg:px-6 xl:grid-cols-[1.2fr_0.8fr]">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Список проектов</CardTitle>
-                  <CardDescription>
-                    Расчёт раскроя и подготовка производственных карт
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="px-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="pl-6">Проект</TableHead>
-                        <TableHead>Панели</TableHead>
-                        <TableHead>Детали</TableHead>
-                        <TableHead>Статус</TableHead>
-                        <TableHead className="pr-6 text-right">Расчёт</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {projects.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                            Проектов пока нет. Создайте первый проект справа.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        projects.map((project) => {
-                          const partsCount = project.panels.reduce(
-                            (sum, panel) => sum + panel.parts.length,
-                            0,
-                          );
-                          const calculatedCount = project.panels.filter(
-                            (panel) => panel.cutPlans.length > 0,
-                          ).length;
-
-                          return (
-                          <TableRow key={project.id}>
-                            <TableCell className="pl-6 font-medium">
-                              <Link
-                                href={`/projects/${project.id}`}
-                                className="hover:underline"
-                              >
-                                {project.name}
-                              </Link>
-                            </TableCell>
-                            <TableCell>{project.panels.length}</TableCell>
-                            <TableCell>{partsCount}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{project.status}</Badge>
-                            </TableCell>
-                            <TableCell className="pr-6 text-right text-muted-foreground">
-                              {calculatedCount > 0
-                                ? `${calculatedCount} пан. с расчётом`
-                                : "без расчёта"}
-                            </TableCell>
-                          </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Новый проект</CardTitle>
-                  <CardDescription>
-                    Укажите материал, формат листа и профиль станка
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <CreateProjectForm
-                    materials={catalog.materials}
-                    sheetFormats={catalog.sheetFormats}
-                    machineProfiles={catalog.machineProfiles}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="mx-4 gap-0 overflow-hidden py-0 lg:mx-6">
+              <CardHeader className="border-b px-6 py-6">
+                <CardTitle>{labels.tableTitle}</CardTitle>
+                <CardDescription>{labels.tableDescription}</CardDescription>
+              </CardHeader>
+              <CardContent className="px-0 pb-0">
+                <EstimatorCalculationsTable
+                  rows={rows}
+                  emptyMessage={labels.emptyList}
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

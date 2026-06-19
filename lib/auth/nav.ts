@@ -13,15 +13,19 @@ export type SidebarNavConfig = {
   items: NavMainItem[];
   projectHref: (projectId: string) => string;
   showRecentProjects: boolean;
+  recentLabel: string;
+  listAllLabel: string;
 };
 
 const estimatorNav: SidebarNavConfig = {
   groupLabel: "Работа",
   projectHref: (projectId) => `/projects/${projectId}`,
   showRecentProjects: true,
+  recentLabel: "Недавние расчёты",
+  listAllLabel: "Все расчёты",
   items: [
     {
-      title: "Проекты",
+      title: "Расчёты",
       url: "/",
       icon: IconLayoutKanban,
     },
@@ -51,6 +55,8 @@ const operatorNav: SidebarNavConfig = {
   groupLabel: "Смена",
   projectHref: (projectId) => `/operator/projects/${projectId}`,
   showRecentProjects: false,
+  recentLabel: "Недавние задания",
+  listAllLabel: "Все задания",
   items: [
     {
       title: "Задания",

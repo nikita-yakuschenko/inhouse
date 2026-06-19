@@ -200,13 +200,24 @@ export async function calculateProject(projectId: string): Promise<string> {
   const panels = await prisma.panel.findMany({
     where: { projectId },
     orderBy: { sortOrder: "asc" },
-    take: 1,
+    include: {
+      parts: { select: { id: true } },
+    },
   });
 
-  const panel = panels[0];
-  if (!panel) {
+  if (panels.length === 0) {
     throw new Error("Создайте панель перед расчётом");
   }
 
-  return calculatePanel(panel.id);
+  const panelsWithParts = panels.filter((panel) => panel.parts.length > 0);
+  if (panelsWithParts.length === 0) {
+    throw new Error("Добавьте детали на панели перед расчётом");
+  }
+
+  let lastCutPlanId = "";
+  for (const panel of panelsWithParts) {
+    lastCutPlanId = await calculatePanel(panel.id);
+  }
+
+  return lastCutPlanId;
 }

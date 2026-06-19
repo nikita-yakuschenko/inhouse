@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { getOperatorAssignments } from "@/features/projects/queries";
 import { getAppRole } from "@/lib/auth/session";
+import { getWorkspaceLabels } from "@/lib/auth/workspace-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +33,15 @@ export default async function OperatorAssignmentsPage() {
 
   const assignments = await getOperatorAssignments();
 
+  const labels = getWorkspaceLabels("operator");
+
   return (
     <AppPage
       header={
         <SiteHeader
           breadcrumbs={[
             { label: "Smartcut", href: "/operator" },
-            { label: "Задания" },
+            { label: labels.section },
           ]}
         />
       }
@@ -49,11 +52,8 @@ export default async function OperatorAssignmentsPage() {
             <div className="px-4 lg:px-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Задания на смену</CardTitle>
-                  <CardDescription>
-                    Панели с готовым расчётом раскроя — откройте задание и выполняйте
-                    операции по порядку
-                  </CardDescription>
+                  <CardTitle>{labels.tableTitle}</CardTitle>
+                  <CardDescription>{labels.tableDescription}</CardDescription>
                 </CardHeader>
                 <CardContent className="px-0">
                   <Table>

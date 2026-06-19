@@ -15,10 +15,12 @@ export function CreateProjectForm({
   materials,
   sheetFormats,
   machineProfiles,
+  submitLabel = "Создать проект",
 }: {
   materials: Material[];
   sheetFormats: (SheetFormat & { material: Material })[];
   machineProfiles: MachineProfile[];
+  submitLabel?: string;
 }) {
   const catalogReady =
     materials.length > 0 && sheetFormats.length > 0 && machineProfiles.length > 0;
@@ -64,27 +66,21 @@ npm run db:seed`}
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="customerName">Заказчик</Label>
-          <Input id="customerName" name="customerName" />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="materialId">Материал</Label>
-          <select
-            id="materialId"
-            name="materialId"
-            required
-            defaultValue={defaultMaterial}
-            className={fieldClassName}
-          >
-            {materials.map((material) => (
-              <option key={material.id} value={material.id}>
-                {material.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="grid gap-2">
+        <Label htmlFor="materialId">Материал</Label>
+        <select
+          id="materialId"
+          name="materialId"
+          required
+          defaultValue={defaultMaterial}
+          className={fieldClassName}
+        >
+          {materials.map((material) => (
+            <option key={material.id} value={material.id}>
+              {material.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -133,7 +129,7 @@ npm run db:seed`}
       </div>
 
       <Button type="submit" className="w-fit">
-        Создать проект
+        {submitLabel}
       </Button>
     </form>
   );

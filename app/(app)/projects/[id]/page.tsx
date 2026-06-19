@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 
 import { AppPage } from "@/components/app-page";
-import { PanelWorkspace } from "@/components/projects/panel-workspace";
+import { EstimatorWorkspace } from "@/components/projects/estimator-workspace";
 import { SiteHeader } from "@/components/site-header";
 import { getProjectById } from "@/features/projects/queries";
 import { requireAppRole } from "@/lib/auth/session";
 import { isEntityId } from "@/lib/id";
 import { serializePanelsForClient, serializeSheetContext } from "@/features/projects/serialize-panels";
+import { getWorkspaceLabels } from "@/lib/auth/workspace-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export default async function EstimatorProjectPage({
   searchParams: Promise<{ panel?: string; sheet?: string }>;
 }) {
   await requireAppRole("estimator");
+
+  const labels = getWorkspaceLabels("estimator");
 
   const { id } = await params;
   const query = await searchParams;
@@ -39,15 +42,15 @@ export default async function EstimatorProjectPage({
         <SiteHeader
           breadcrumbs={[
             { label: "Smartcut", href: "/" },
-            { label: "Проекты", href: "/" },
+            { label: labels.section, href: "/" },
             { label: project.name },
           ]}
         />
       }
     >
-      <PanelWorkspace
-        mode="estimator"
+      <EstimatorWorkspace
         projectId={project.id}
+        projectName={project.name}
         panels={serializePanelsForClient(project.panels)}
         sheetContext={serializeSheetContext(project)}
         initialSheetParam={query.sheet ?? null}

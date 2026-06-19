@@ -39,7 +39,12 @@ export function AppSidebar({
       <SidebarContent>
         <NavMain items={nav.items} groupLabel={nav.groupLabel} />
         {nav.showRecentProjects ? (
-          <NavProjects projects={recentProjects} projectHref={nav.projectHref} />
+          <NavProjects
+            projects={recentProjects}
+            projectHref={nav.projectHref}
+            recentLabel={nav.recentLabel}
+            listAllLabel={nav.listAllLabel}
+          />
         ) : null}
       </SidebarContent>
       <SidebarFooter>
