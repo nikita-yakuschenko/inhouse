@@ -1,0 +1,402 @@
+// Prisma schema for cutting service vertical slice
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProjectStatus {
+  draft
+  calculated
+  approved
+  in_production
+  completed
+  archived
+}
+
+enum ProjectMode {
+  production
+  economy
+  gkl_installation
+}
+
+enum CutPlanStatus {
+  calculating
+  calculated
+  failed
+  approved
+  archived
+}
+
+enum ShapeType {
+  rectangle
+  l_shape
+  p_shape
+  rectangle_with_edge_cutout
+  rectangle_with_internal_cutout
+  custom_orthogonal
+}
+
+enum OperationType {
+  trim_cut
+  full_cut
+  stop_cut
+  internal_cut
+  corner_drill
+  manual_finish
+  label_part
+  save_offcut
+}
+
+enum CutAxis {
+  vertical
+  horizontal
+  none
+}
+
+enum RiskLevel {
+  normal
+  attention
+  risky
+}
+
+model Organization {
+  id        String   @id @db.Char(8)
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users           User[]
+  materials       Material[]
+  sheetFormats    SheetFormat[]
+  machineProfiles MachineProfile[]
+  projects        Project[]
+  offcuts         Offcut[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @db.Char(8)
+  organizationId String   @map("organization_id")
+  name           String
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  role           String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  projects     Project[]    @relation("ProjectCreator")
+  cutPlans     CutPlan[]    @relation("CutPlanCreator")
+
+  @@map("users")
+}
+
+model Material {
+  id                  String   @id @db.Char(8)
+  organizationId      String   @map("organization_id")
+  name                String
+  materialType        String   @map("material_type")
+  thicknessMm         Int      @map("thickness_mm")
+  densityKgM2         Decimal? @map("density_kg_m2")
+  pricePerM2          Decimal? @map("price_per_m2")
+  hasGrainDirection   Boolean  @default(false) @map("has_grain_direction")
+  defaultSheetWidthMm Int?     @map("default_sheet_width_mm")
+  defaultSheetHeightMm Int?    @map("default_sheet_height_mm")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  sheetFormats SheetFormat[]
+  parts        Part[]
+  projects     Project[]
+  offcuts      Offcut[]
+  plannedOffcuts PlannedOffcut[]
+
+  @@map("materials")
+}
+
+model SheetFormat {
+  id             String   @id @db.Char(8)
+  organizationId String   @map("organization_id")
+  materialId     String   @map("material_id")
+  name           String
+  widthMm        Int      @map("width_mm")
+  heightMm       Int      @map("height_mm")
+  thicknessMm    Int      @map("thickness_mm")
+  pricePerSheet  Decimal? @map("price_per_sheet")
+  trimLeftMm     Int      @default(0) @map("trim_left_mm")
+  trimRightMm    Int      @default(0) @map("trim_right_mm")
+  trimTopMm      Int      @default(0) @map("trim_top_mm")
+  trimBottomMm   Int      @default(0) @map("trim_bottom_mm")
+  isDefault      Boolean  @default(false) @map("is_default")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  material     Material     @relation(fields: [materialId], references: [id])
+  parts        Part[]
+  projects     Project[]
+  cutPlanSheets CutPlanSheet[]
+
+  @@map("sheet_formats")
+}
+
+model MachineProfile {
+  id                                    String   @id @db.Char(8)
+  organizationId                        String   @map("organization_id")
+  name                                  String
+  machineType                           String   @map("machine_type")
+  maxSheetWidthMm                       Int      @map("max_sheet_width_mm")
+  maxSheetHeightMm                      Int      @map("max_sheet_height_mm")
+  maxSheetThicknessMm                   Int      @map("max_sheet_thickness_mm")
+  defaultKerfMm                         Int      @default(4) @map("default_kerf_mm")
+  minSafePartWidthMm                    Int      @default(80) @map("min_safe_part_width_mm")
+  minSafePartHeightMm                   Int      @default(80) @map("min_safe_part_height_mm")
+  minUsefulOffcutWidthMm                Int      @default(300) @map("min_useful_offcut_width_mm")
+  minUsefulOffcutHeightMm               Int      @default(300) @map("min_useful_offcut_height_mm")
+  supportsVerticalCut                   Boolean  @default(true) @map("supports_vertical_cut")
+  supportsHorizontalCut                 Boolean  @default(true) @map("supports_horizontal_cut")
+  supportsFullCut                       Boolean  @default(true) @map("supports_full_cut")
+  supportsStopCut                       Boolean  @default(true) @map("supports_stop_cut")
+  supportsInternalCut                   Boolean  @default(true) @map("supports_internal_cut")
+  supportsPlungeCut                     Boolean  @default(false) @map("supports_plunge_cut")
+  requiresCornerDrillingForInternalCut  Boolean  @default(false) @map("requires_corner_drilling_for_internal_cut")
+  preferredPrimaryAxis                  String   @default("auto") @map("preferred_primary_axis")
+  coordinateOrigin                      String   @default("bottom_left") @map("coordinate_origin")
+  isDefault                             Boolean  @default(false) @map("is_default")
+  isActive                              Boolean  @default(true) @map("is_active")
+  createdAt                             DateTime @default(now()) @map("created_at")
+  updatedAt                             DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  cutPlans     CutPlan[]
+  projects     Project[]
+
+  @@map("machine_profiles")
+}
+
+model Project {
+  id              String        @id @db.Char(8)
+  organizationId  String        @map("organization_id")
+  name            String
+  description     String?
+  customerName    String?       @map("customer_name")
+  status          ProjectStatus @default(draft)
+  mode            ProjectMode   @default(production)
+  materialId      String?       @map("material_id")
+  sheetFormatId   String?       @map("sheet_format_id")
+  machineProfileId String?      @map("machine_profile_id")
+  createdByUserId String?       @map("created_by_user_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  createdBy      User?          @relation("ProjectCreator", fields: [createdByUserId], references: [id])
+  material       Material?      @relation(fields: [materialId], references: [id])
+  sheetFormat    SheetFormat?   @relation(fields: [sheetFormatId], references: [id])
+  machineProfile MachineProfile? @relation(fields: [machineProfileId], references: [id])
+  panels         Panel[]
+  parts          Part[]
+  cutPlans       CutPlan[]
+
+  @@map("projects")
+}
+
+model Panel {
+  id        String   @id @db.Char(8)
+  projectId String   @map("project_id")
+  name      String
+  code      String?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parts    Part[]
+  cutPlans CutPlan[]
+
+  @@map("panels")
+}
+
+model Part {
+  id                     String    @id @db.Char(8)
+  projectId              String    @map("project_id")
+  panelId                String?   @map("panel_id")
+  materialId             String?   @map("material_id")
+  sheetFormatId          String?   @map("sheet_format_id")
+  name                   String
+  code                   String?
+  quantity               Int       @default(1)
+  shapeType              ShapeType @default(rectangle) @map("shape_type")
+  widthMm                Int       @map("width_mm")
+  heightMm               Int       @map("height_mm")
+  allowRotation          Boolean   @default(true) @map("allow_rotation")
+  grainDirectionRequired Boolean   @default(false) @map("grain_direction_required")
+  priority               Int       @default(0)
+  comment                String?
+  geometryJson           Json?     @map("geometry_json")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  panel       Panel?       @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  material    Material?    @relation(fields: [materialId], references: [id])
+  sheetFormat SheetFormat? @relation(fields: [sheetFormatId], references: [id])
+  placements  Placement[]
+
+  @@map("parts")
+}
+
+model CutPlan {
+  id                      String        @id @db.Char(8)
+  projectId               String        @map("project_id")
+  panelId                 String?       @map("panel_id")
+  machineProfileId        String        @map("machine_profile_id")
+  status                  CutPlanStatus @default(calculated)
+  algorithmVersion        String        @map("algorithm_version")
+  settingsJson            Json?         @map("settings_json")
+  score                   Decimal?
+  totalSheetsCount        Int           @default(0) @map("total_sheets_count")
+  totalMaterialAreaMm2    BigInt        @default(0) @map("total_material_area_mm2")
+  totalPartsAreaMm2       BigInt        @default(0) @map("total_parts_area_mm2")
+  totalWasteAreaMm2       BigInt        @default(0) @map("total_waste_area_mm2")
+  usefulOffcutsAreaMm2    BigInt        @default(0) @map("useful_offcuts_area_mm2")
+  wastePercent            Decimal?      @map("waste_percent")
+  totalCutLengthMm        BigInt        @default(0) @map("total_cut_length_mm")
+  totalOperationsCount    Int           @default(0) @map("total_operations_count")
+  totalSetupChangesCount  Int           @default(0) @map("total_setup_changes_count")
+  totalManualOperationsCount Int        @default(0) @map("total_manual_operations_count")
+  createdByUserId         String?       @map("created_by_user_id")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  panel          Panel?         @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  machineProfile MachineProfile @relation(fields: [machineProfileId], references: [id])
+  createdBy      User?          @relation("CutPlanCreator", fields: [createdByUserId], references: [id])
+  sheets         CutPlanSheet[]
+
+  @@map("cut_plans")
+}
+
+model CutPlanSheet {
+  id                   String   @id @db.Char(8)
+  cutPlanId            String   @map("cut_plan_id")
+  sourceType           String   @default("full_sheet") @map("source_type")
+  sourceSheetFormatId  String?  @map("source_sheet_format_id")
+  sheetIndex           Int      @map("sheet_index")
+  widthMm              Int      @map("width_mm")
+  heightMm             Int      @map("height_mm")
+  usableXmm            Int      @map("usable_x_mm")
+  usableYmm            Int      @map("usable_y_mm")
+  usableWidthMm        Int      @map("usable_width_mm")
+  usableHeightMm       Int      @map("usable_height_mm")
+  materialId           String?  @map("material_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  cutPlan           CutPlan      @relation(fields: [cutPlanId], references: [id], onDelete: Cascade)
+  sourceSheetFormat SheetFormat? @relation(fields: [sourceSheetFormatId], references: [id])
+  placements        Placement[]
+  operations        CutOperation[]
+  plannedOffcuts    PlannedOffcut[]
+
+  @@map("cut_plan_sheets")
+}
+
+model Placement {
+  id               String   @id @db.Char(8)
+  cutPlanSheetId   String   @map("cut_plan_sheet_id")
+  partId           String   @map("part_id")
+  partInstanceIndex Int     @map("part_instance_index")
+  xMm              Int      @map("x_mm")
+  yMm              Int      @map("y_mm")
+  widthMm          Int      @map("width_mm")
+  heightMm         Int      @map("height_mm")
+  rotationDeg      Int      @default(0) @map("rotation_deg")
+  geometryJson     Json?    @map("geometry_json")
+  label            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  cutPlanSheet CutPlanSheet @relation(fields: [cutPlanSheetId], references: [id], onDelete: Cascade)
+  part         Part         @relation(fields: [partId], references: [id])
+
+  @@map("placements")
+}
+
+model CutOperation {
+  id               String        @id @db.Char(8)
+  cutPlanSheetId   String        @map("cut_plan_sheet_id")
+  sequenceNumber   Int           @map("sequence_number")
+  operationType    OperationType @map("operation_type")
+  axis             CutAxis       @default(none)
+  x1Mm             Int?          @map("x1_mm")
+  y1Mm             Int?          @map("y1_mm")
+  x2Mm             Int?          @map("x2_mm")
+  y2Mm             Int?          @map("y2_mm")
+  positionMm       Int?          @map("position_mm")
+  workpieceRef     String?       @map("workpiece_ref")
+  targetPartId     String?       @map("target_part_id")
+  setupValueMm     Int?          @map("setup_value_mm")
+  kerfMm           Int?          @map("kerf_mm")
+  note             String?
+  riskLevel        RiskLevel     @default(normal) @map("risk_level")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  cutPlanSheet CutPlanSheet @relation(fields: [cutPlanSheetId], references: [id], onDelete: Cascade)
+
+  @@map("cut_operations")
+}
+
+model PlannedOffcut {
+  id             String   @id @db.Char(8)
+  cutPlanSheetId String   @map("cut_plan_sheet_id")
+  materialId     String?  @map("material_id")
+  xMm            Int      @map("x_mm")
+  yMm            Int      @map("y_mm")
+  widthMm        Int      @map("width_mm")
+  heightMm       Int      @map("height_mm")
+  geometryJson   Json?    @map("geometry_json")
+  areaMm2        BigInt   @map("area_mm2")
+  isUseful       Boolean  @default(false) @map("is_useful")
+  status         String   @default("planned")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  cutPlanSheet CutPlanSheet @relation(fields: [cutPlanSheetId], references: [id], onDelete: Cascade)
+  material     Material?    @relation(fields: [materialId], references: [id])
+
+  @@map("planned_offcuts")
+}
+
+model Offcut {
+  id               String   @id @db.Char(8)
+  organizationId   String   @map("organization_id")
+  materialId       String   @map("material_id")
+  sheetFormatId    String?  @map("sheet_format_id")
+  sourceProjectId  String?  @map("source_project_id")
+  sourceCutPlanId  String?  @map("source_cut_plan_id")
+  name             String
+  widthMm          Int      @map("width_mm")
+  heightMm         Int      @map("height_mm")
+  geometryJson     Json?    @map("geometry_json")
+  status           String   @default("available")
+  location         String?
+  comment          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  material     Material     @relation(fields: [materialId], references: [id])
+
+  @@map("offcuts")
+}

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cutting-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cutting
+      POSTGRES_PASSWORD: cutting
+      POSTGRES_DB: cutting
+    ports:
+      - "55432:5432"
+    volumes:
+      - cutting_pg_data:/var/lib/postgresql/data
+
+volumes:
+  cutting_pg_data:
