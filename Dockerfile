@@ -22,8 +22,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-# Prisma CLI нужен для migrate deploy (пакет в devDependencies)
 COPY --from=builder /app ./
+RUN chmod +x scripts/docker-entrypoint.sh
 EXPOSE 3000
-# миграций в репо нет — схема накатывается через db push
-CMD ["sh", "-c", "npx prisma db push && npm start"]
+# ждём БД → схема → seed → start (seed upsert, данные не затирает)
+CMD ["sh", "scripts/docker-entrypoint.sh"]
