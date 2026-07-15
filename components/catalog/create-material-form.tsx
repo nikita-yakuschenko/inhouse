@@ -27,15 +27,15 @@ export function CreateMaterialForm() {
   }
 
   return (
-    <form action={handleSubmit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2 lg:grid-cols-4">
+    <form action={handleSubmit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2 lg:grid-cols-5">
       <input type="hidden" name="materialType" value="sheet" />
-      <div className="grid gap-2 sm:col-span-2 lg:col-span-3">
+      <div className="grid gap-2 sm:col-span-2 lg:col-span-2">
         <Label htmlFor="material-name">Название</Label>
         <Input
           id="material-name"
           name="name"
           required
-          placeholder="Например, Плита ГСПВ 12,5 мм"
+          placeholder="Плита ГСПВ"
           disabled={pending}
         />
       </div>
@@ -51,7 +51,31 @@ export function CreateMaterialForm() {
           disabled={pending}
         />
       </div>
-      <div className="flex items-end sm:col-span-2 lg:col-span-4">
+      <div className="grid gap-2">
+        <Label htmlFor="material-width">Ширина листа, мм</Label>
+        <Input
+          id="material-width"
+          name="widthMm"
+          type="number"
+          required
+          min={1}
+          placeholder="1250"
+          disabled={pending}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="material-height">Длина листа, мм</Label>
+        <Input
+          id="material-height"
+          name="heightMm"
+          type="number"
+          required
+          min={1}
+          placeholder="3000"
+          disabled={pending}
+        />
+      </div>
+      <div className="flex items-end sm:col-span-2 lg:col-span-5">
         <Button type="submit" disabled={pending}>
           {pending ? "Сохранение…" : "Добавить материал"}
         </Button>

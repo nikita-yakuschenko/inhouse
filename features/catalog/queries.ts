@@ -5,7 +5,10 @@ export async function getMaterialsCatalog() {
     where: { isActive: true },
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { sheetFormats: true } },
+      sheetFormats: {
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+      },
     },
   });
 }

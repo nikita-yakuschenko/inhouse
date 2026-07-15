@@ -18,7 +18,7 @@ const fieldClassName = cn(
 );
 
 export function CreateProjectForm({
-  materials,
+  materials: _materials,
   sheetFormats,
   machineProfiles,
   submitLabel = "Создать проект",
@@ -31,10 +31,8 @@ export function CreateProjectForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const catalogReady =
-    materials.length > 0 && sheetFormats.length > 0 && machineProfiles.length > 0;
+  const catalogReady = sheetFormats.length > 0 && machineProfiles.length > 0;
 
-  const defaultMaterial = materials[0]?.id ?? "";
   const defaultSheet =
     sheetFormats.find((sheet) => sheet.isDefault)?.id ?? sheetFormats[0]?.id ?? "";
   const defaultMachine =
@@ -47,23 +45,20 @@ export function CreateProjectForm({
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
         <h3 className="text-base font-semibold">Справочники не загружены</h3>
         <p className="mt-2">
-          Форма создания проекта пустая, потому что в базе нет материалов, форматов
-          листов и профилей станков.
-        </p>
-        <p className="mt-3 font-medium">Выполните в терминале:</p>
-        <pre className="mt-2 overflow-x-auto rounded-md bg-white p-3 text-xs text-slate-800">
-{`docker compose up -d
-npx prisma db push
-npm run db:seed`}
-        </pre>
-        <p className="mt-3">
-          После этого обновите страницу — в выпадающих списках появятся значения.
+          Добавьте материал в «Справочники → Материалы» и убедитесь, что есть профиль
+          станка.
         </p>
       </div>
     );
   }
 
   function handleSubmit(formData: FormData) {
+    const sheetFormatId = String(formData.get("sheetFormatId") ?? "");
+    const sheet = sheetFormats.find((item) => item.id === sheetFormatId);
+    if (sheet) {
+      formData.set("materialId", sheet.materialId);
+    }
+
     startTransition(async () => {
       const result = await createProjectAction(formData);
       if (!result.ok) {
@@ -91,27 +86,9 @@ npm run db:seed`}
         />
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="materialId">Материал</Label>
-        <select
-          id="materialId"
-          name="materialId"
-          required
-          defaultValue={defaultMaterial}
-          className={fieldClassName}
-          disabled={pending}
-        >
-          {materials.map((material) => (
-            <option key={material.id} value={material.id}>
-              {material.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="sheetFormatId">Формат листа</Label>
+          <Label htmlFor="sheetFormatId">Материал</Label>
           <select
             id="sheetFormatId"
             name="sheetFormatId"
@@ -122,7 +99,7 @@ npm run db:seed`}
           >
             {sheetFormats.map((sheet) => (
               <option key={sheet.id} value={sheet.id}>
-                {sheet.name} ({sheet.widthMm}×{sheet.heightMm})
+                {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×{sheet.thicknessMm}
               </option>
             ))}
           </select>
