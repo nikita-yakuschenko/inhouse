@@ -6,14 +6,14 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-# prisma.config читает URL при generate
-ENV DATABASE_URL="postgresql://cutting:cutting@postgres:5432/cutting"
+# prisma generate не ходит в БД — URL только для конфига
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/cutting"
 RUN npm ci
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV DATABASE_URL="postgresql://cutting:cutting@postgres:5432/cutting"
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/cutting"
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx prisma generate && npm run build
 

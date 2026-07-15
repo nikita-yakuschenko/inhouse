@@ -19,7 +19,8 @@ export function collectCutPlanPdfSheets(panels: ClientPanel[]): CutPlanPdfSheet[
     }
 
     return cutPlan.sheets.map((sheet) => ({
-      panelName: panel.name,
+      // В PDF — марка панели (Ст-1-02), полное имя остаётся в данных панели.
+      panelName: panel.code?.trim() || panel.name,
       sheet,
     }));
   });

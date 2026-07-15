@@ -86,7 +86,9 @@ export function EstimatorCalculationsTable({
     () => [
       {
         accessorKey: "name",
-        header: ({ column }) => <SortableHeader column={column}>Проект</SortableHeader>,
+        header: ({ column }) => (
+          <SortableHeader column={column}>Зав. № домокомплекта</SortableHeader>
+        ),
         cell: ({ row }) => (
           <div className="flex min-w-48 items-start gap-3">
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/70">
@@ -94,8 +96,19 @@ export function EstimatorCalculationsTable({
             </span>
             <div className="min-w-0">
               <p className="font-medium">{row.original.name}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                {row.original.id}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {[
+                  row.original.contractNumber
+                    ? `Дог. ${row.original.contractNumber}`
+                    : null,
+                  row.original.technology === "pkd"
+                    ? "ПКД"
+                    : row.original.technology === "md"
+                      ? "МД"
+                      : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || row.original.id}
               </p>
             </div>
           </div>
@@ -140,7 +153,9 @@ export function EstimatorCalculationsTable({
           <div className="flex items-center justify-end gap-0.5">
             <EditProjectButton
               projectId={row.original.id}
-              projectName={row.original.name}
+              factoryNumber={row.original.name}
+              contractNumber={row.original.contractNumber}
+              technology={row.original.technology}
             />
             <DeleteProjectButton
               projectId={row.original.id}

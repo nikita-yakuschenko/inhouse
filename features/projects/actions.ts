@@ -4,10 +4,17 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { entityIdSchema, generateEntityId } from "@/lib/id";
+import { PROJECT_TECHNOLOGY_VALUES } from "@/lib/projects/technology";
 import { SEED_IDS } from "@/lib/seed-ids";
 
+const technologySchema = z.enum(PROJECT_TECHNOLOGY_VALUES, {
+  message: "Выберите технологию",
+});
+
 const createProjectSchema = z.object({
-  name: z.string().min(1, "Укажите название проекта"),
+  name: z.string().trim().min(1, "Укажите заводской номер домокомплекта"),
+  contractNumber: z.string().trim().min(1, "Укажите номер договора"),
+  technology: technologySchema,
   description: z.string().optional(),
   customerName: z.string().optional(),
   materialId: entityIdSchema,
@@ -18,6 +25,8 @@ const createProjectSchema = z.object({
 export async function createProjectAction(formData: FormData) {
   const parsed = createProjectSchema.safeParse({
     name: formData.get("name"),
+    contractNumber: formData.get("contractNumber"),
+    technology: formData.get("technology"),
     description: formData.get("description") || undefined,
     customerName: formData.get("customerName") || undefined,
     materialId: formData.get("materialId"),
@@ -41,6 +50,8 @@ export async function createProjectAction(formData: FormData) {
         id: projectId,
         organizationId: SEED_IDS.organization,
         name: parsed.data.name,
+        contractNumber: parsed.data.contractNumber,
+        technology: parsed.data.technology,
         description: parsed.data.description,
         customerName: parsed.data.customerName,
         materialId: parsed.data.materialId,
@@ -70,40 +81,64 @@ export async function createProjectAction(formData: FormData) {
   }
 }
 
-export async function updateProjectNameAction(projectId: string, name: string) {
-  const idParsed = entityIdSchema.safeParse(projectId);
-  if (!idParsed.success) {
-    return { ok: false as const, error: "Некорректный идентификатор проекта" };
-  }
-
-  const nameParsed = z
+const updateProjectSchema = z.object({
+  projectId: entityIdSchema,
+  name: z
     .string()
     .trim()
-    .min(1, "Укажите название проекта")
-    .max(120, "Слишком длинное название")
-    .safeParse(name);
+    .min(1, "Укажите заводской номер домокомплекта")
+    .max(120, "Слишком длинный заводской номер"),
+  contractNumber: z
+    .string()
+    .trim()
+    .min(1, "Укажите номер договора")
+    .max(120, "Слишком длинный номер договора"),
+  technology: technologySchema,
+});
 
-  if (!nameParsed.success) {
+export async function updateProjectAction(input: {
+  projectId: string;
+  name: string;
+  contractNumber: string;
+  technology: string;
+}) {
+  const parsed = updateProjectSchema.safeParse(input);
+
+  if (!parsed.success) {
     return {
       ok: false as const,
-      error: nameParsed.error.issues[0]?.message ?? "Некорректное название",
+      error: parsed.error.issues[0]?.message ?? "Некорректные данные",
     };
   }
 
   try {
     const project = await prisma.project.update({
-      where: { id: idParsed.data },
-      data: { name: nameParsed.data },
-      select: { id: true, name: true },
+      where: { id: parsed.data.projectId },
+      data: {
+        name: parsed.data.name,
+        contractNumber: parsed.data.contractNumber,
+        technology: parsed.data.technology,
+      },
+      select: {
+        id: true,
+        name: true,
+        contractNumber: true,
+        technology: true,
+      },
     });
 
     revalidatePath("/");
     revalidatePath("/operator");
     revalidatePath(`/projects/${project.id}`);
-    return { ok: true as const, name: project.name };
+    return {
+      ok: true as const,
+      name: project.name,
+      contractNumber: project.contractNumber,
+      technology: project.technology,
+    };
   } catch (error) {
-    console.error("updateProjectNameAction failed", error);
-    return { ok: false as const, error: "Не удалось сохранить название" };
+    console.error("updateProjectAction failed", error);
+    return { ok: false as const, error: "Не удалось сохранить расчёт" };
   }
 }
 

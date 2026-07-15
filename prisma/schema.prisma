@@ -23,6 +23,11 @@ enum ProjectMode {
   gkl_installation
 }
 
+enum ProjectTechnology {
+  pkd
+  md
+}
+
 enum CutPlanStatus {
   calculating
   calculated
@@ -183,24 +188,26 @@ model MachineProfile {
 }
 
 model Project {
-  id              String        @id @db.Char(8)
-  organizationId  String        @map("organization_id")
-  name            String
-  description     String?
-  customerName    String?       @map("customer_name")
-  status          ProjectStatus @default(draft)
-  mode            ProjectMode   @default(production)
-  materialId      String?       @map("material_id")
-  sheetFormatId   String?       @map("sheet_format_id")
-  machineProfileId String?      @map("machine_profile_id")
-  createdByUserId String?       @map("created_by_user_id")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id               String             @id @db.Char(8)
+  organizationId   String             @map("organization_id")
+  name             String
+  description      String?
+  customerName     String?            @map("customer_name")
+  contractNumber   String?            @map("contract_number")
+  technology       ProjectTechnology?
+  status           ProjectStatus      @default(draft)
+  mode             ProjectMode        @default(production)
+  materialId       String?            @map("material_id")
+  sheetFormatId    String?            @map("sheet_format_id")
+  machineProfileId String?            @map("machine_profile_id")
+  createdByUserId  String?            @map("created_by_user_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
 
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  createdBy      User?          @relation("ProjectCreator", fields: [createdByUserId], references: [id])
-  material       Material?      @relation(fields: [materialId], references: [id])
-  sheetFormat    SheetFormat?   @relation(fields: [sheetFormatId], references: [id])
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  createdBy      User?           @relation("ProjectCreator", fields: [createdByUserId], references: [id])
+  material       Material?       @relation(fields: [materialId], references: [id])
+  sheetFormat    SheetFormat?    @relation(fields: [sheetFormatId], references: [id])
   machineProfile MachineProfile? @relation(fields: [machineProfileId], references: [id])
   panels         Panel[]
   parts          Part[]

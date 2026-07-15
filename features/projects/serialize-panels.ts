@@ -71,6 +71,7 @@ export type ClientPart = Pick<
 export type ClientPanel = {
   id: string;
   name: string;
+  code: string | null;
   parts: ClientPart[];
   cutPlans: ClientCutPlan[];
 };
@@ -158,6 +159,7 @@ export function serializeSheetContext(
 type PanelWithRelations = {
   id: string;
   name: string;
+  code: string | null;
   parts: Part[];
   cutPlans: (CutPlan & {
     sheets: (CutPlanSheet & {
@@ -172,6 +174,7 @@ export function serializePanelsForClient(panels: PanelWithRelations[]): ClientPa
   return panels.map((panel) => ({
     id: panel.id,
     name: panel.name,
+    code: panel.code,
     parts: panel.parts.map((part) => ({
       id: part.id,
       name: part.name,

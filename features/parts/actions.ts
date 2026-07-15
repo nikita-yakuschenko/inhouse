@@ -64,13 +64,11 @@ export async function createPartAction(formData: FormData) {
 
 const importPartsSchema = z.object({
   projectId: entityIdSchema,
-  panelId: entityIdSchema,
 });
 
 export async function importPartsFromXlsxAction(formData: FormData) {
   const parsed = importPartsSchema.safeParse({
     projectId: formData.get("projectId"),
-    panelId: formData.get("panelId"),
   });
 
   if (!parsed.success) {
@@ -93,13 +91,51 @@ export async function importPartsFromXlsxAction(formData: FormData) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const importedParts = parseSpecificationXlsx(buffer);
 
-    const ids = generateEntityIds(importedParts.length);
+    // Одна панель на проект: марка стены живёт в коде детали (Ст-1-02-01), не в табах.
+    const existingPanels = await prisma.panel.findMany({
+      where: { projectId: parsed.data.projectId },
+      orderBy: { sortOrder: "asc" },
+    });
 
+    let panelId = existingPanels[0]?.id;
+    if (!panelId) {
+      panelId = generateEntityId();
+      await prisma.panel.create({
+        data: {
+          id: panelId,
+          projectId: parsed.data.projectId,
+          name: "Спецификация",
+          code: null,
+          sortOrder: 0,
+        },
+      });
+    } else {
+      await prisma.panel.update({
+        where: { id: panelId },
+        data: { name: "Спецификация", code: null },
+      });
+    }
+
+    // Сброс старых раскроев и деталей по всему проекту.
+    await prisma.cutPlan.deleteMany({ where: { projectId: parsed.data.projectId } });
+    await prisma.part.deleteMany({ where: { projectId: parsed.data.projectId } });
+
+    // Лишние панели (бывшие Ст-1-0x) убираем — оставляем одну.
+    if (existingPanels.length > 1) {
+      await prisma.panel.deleteMany({
+        where: {
+          projectId: parsed.data.projectId,
+          id: { not: panelId },
+        },
+      });
+    }
+
+    const ids = generateEntityIds(importedParts.length);
     await prisma.part.createMany({
       data: importedParts.map((part, index) => ({
         id: ids[index]!,
         projectId: parsed.data.projectId,
-        panelId: parsed.data.panelId,
+        panelId,
         materialId: project.materialId,
         sheetFormatId: project.sheetFormatId,
         name: part.name,
@@ -113,7 +149,11 @@ export async function importPartsFromXlsxAction(formData: FormData) {
     });
 
     revalidatePath(`/projects/${parsed.data.projectId}`);
-    return { ok: true as const, importedCount: importedParts.length };
+    return {
+      ok: true as const,
+      importedCount: importedParts.length,
+      panelsCount: 1,
+    };
   } catch (error) {
     console.error("importPartsFromXlsxAction failed", error);
     const message =

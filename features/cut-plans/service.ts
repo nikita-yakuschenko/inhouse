@@ -23,7 +23,7 @@ async function saveCutPlanResult(params: {
   // createMany вместо поштучных create — иначе крупные раскрои не укладываются в timeout
   const cutPlan = await prisma.$transaction(
     async (tx) => {
-      await tx.cutPlan.deleteMany({ where: { panelId } });
+      await tx.cutPlan.deleteMany({ where: { projectId } });
 
       const createdPlan = await tx.cutPlan.create({
         data: {
@@ -201,27 +201,65 @@ export async function calculatePanel(panelId: string): Promise<string> {
 }
 
 export async function calculateProject(projectId: string): Promise<string> {
-  const panels = await prisma.panel.findMany({
-    where: { projectId },
-    orderBy: { sortOrder: "asc" },
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
     include: {
-      parts: { select: { id: true } },
+      parts: { orderBy: [{ code: "asc" }, { createdAt: "asc" }] },
+      panels: { orderBy: { sortOrder: "asc" } },
     },
   });
 
-  if (panels.length === 0) {
-    throw new Error("Создайте панель перед расчётом");
+  if (!project) {
+    throw new Error("Проект не найден");
   }
 
-  const panelsWithParts = panels.filter((panel) => panel.parts.length > 0);
-  if (panelsWithParts.length === 0) {
-    throw new Error("Добавьте детали на панели перед расчётом");
+  if (!project.materialId || !project.sheetFormatId || !project.machineProfileId) {
+    throw new Error("Выберите материал, формат листа и профиль станка");
   }
 
-  let lastCutPlanId = "";
-  for (const panel of panelsWithParts) {
-    lastCutPlanId = await calculatePanel(panel.id);
+  if (project.parts.length === 0) {
+    throw new Error("Добавьте хотя бы одну деталь");
   }
 
-  return lastCutPlanId;
+  // Один раскрой на весь проект — без разбиения по стенам.
+  let targetPanelId = project.panels[0]?.id;
+  if (!targetPanelId) {
+    targetPanelId = generateEntityId();
+    await prisma.panel.create({
+      data: {
+        id: targetPanelId,
+        projectId,
+        name: "Спецификация",
+        sortOrder: 0,
+      },
+    });
+  }
+
+  const [material, sheetFormat, machineProfile] = await Promise.all([
+    prisma.material.findUniqueOrThrow({ where: { id: project.materialId } }),
+    prisma.sheetFormat.findUniqueOrThrow({ where: { id: project.sheetFormatId } }),
+    prisma.machineProfile.findUniqueOrThrow({
+      where: { id: project.machineProfileId },
+    }),
+  ]);
+
+  const engineInput = buildEngineInput({
+    project,
+    parts: project.parts,
+    material,
+    sheetFormat,
+    machineProfile,
+  });
+
+  const result = runCuttingEngine(engineInput);
+
+  return saveCutPlanResult({
+    projectId: project.id,
+    panelId: targetPanelId,
+    machineProfileId: machineProfile.id,
+    sheetFormatId: sheetFormat.id,
+    materialId: material.id,
+    engineInput,
+    result,
+  });
 }

@@ -106,14 +106,44 @@ export function CreateProjectForm({
   return (
     <form action={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label htmlFor="name">Название проекта</Label>
+        <Label htmlFor="name">Заводской номер домокомплекта</Label>
         <Input
           id="name"
           name="name"
           required
-          placeholder="Например, ГКЛ офис 204"
+          placeholder="Например, ДК-2026-014"
           disabled={pending}
         />
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="contractNumber">Номер договора</Label>
+        <Input
+          id="contractNumber"
+          name="contractNumber"
+          required
+          placeholder="Например, Д-45/26"
+          disabled={pending}
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="technology">Технология</Label>
+        <select
+          id="technology"
+          name="technology"
+          required
+          defaultValue=""
+          className={selectClassName}
+          style={{ backgroundImage: selectChevron }}
+          disabled={pending}
+        >
+          <option value="" disabled>
+            Выберите технологию
+          </option>
+          <option value="pkd">ПКД (панельно-каркасная)</option>
+          <option value="md">МД (модульная)</option>
+        </select>
       </div>
 
       <div className="grid gap-4">

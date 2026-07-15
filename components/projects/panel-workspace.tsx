@@ -5,7 +5,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { OperationsSheet } from "@/components/cut-plan/operations-sheet";
 import { SheetTabsPanel } from "@/components/cut-plan/sheet-tabs-panel";
 import { PartsPanel } from "@/components/parts/parts-panel";
-import { PanelSelector } from "@/components/projects/panel-selector";
 import { PanelBlockHeader } from "@/components/ui/panel-block-header";
 import type { ClientPanel, ClientSheetContext } from "@/features/projects/serialize-panels";
 import {
@@ -66,12 +65,14 @@ function PanelWorkspaceInner({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const panelFromUrl = searchParams.get("panel");
   const sheetFromUrl = searchParams.get("sheet") ?? initialSheetParam;
-  const activePanel =
-    panels.find((panel) => panel.id === panelFromUrl) ?? panels[0]!;
 
-  const cutPlan = activePanel.cutPlans[0] ?? null;
+  const allParts = useMemo(
+    () => panels.flatMap((panel) => panel.parts),
+    [panels],
+  );
+  const cutPlan =
+    panels.find((panel) => panel.cutPlans[0])?.cutPlans[0] ?? null;
   const cutPlanId = cutPlan?.id ?? null;
 
   const { sheetIdx, groupedPartId } = useMemo(() => {
@@ -80,14 +81,14 @@ function PanelWorkspaceInner({
     }
 
     const arrayIndex = findSheetArrayIndex(cutPlan.sheets, sheetFromUrl);
-    return applySheetSelection(activePanel.parts, cutPlan.sheets, arrayIndex);
-  }, [activePanel.id, activePanel.parts, cutPlan, cutPlanId, sheetFromUrl]);
+    return applySheetSelection(allParts, cutPlan.sheets, arrayIndex);
+  }, [allParts, cutPlan, cutPlanId, sheetFromUrl]);
 
   const activeSheet = cutPlan?.sheets[sheetIdx] ?? cutPlan?.sheets[0] ?? null;
 
-  function replaceWorkspaceQuery(next: { panel: string; sheet: number }) {
+  function replaceWorkspaceQuery(next: { sheet: number }) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("panel", next.panel);
+    params.delete("panel");
     params.set("sheet", String(next.sheet));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
@@ -98,29 +99,15 @@ function PanelWorkspaceInner({
     const sheetNumber = getSheetIndexParam(cutPlan.sheets, sheetIdx);
     if (sheetNumber === null || sheetFromUrl === String(sheetNumber)) return;
 
-    replaceWorkspaceQuery({
-      panel: activePanel.id,
-      sheet: sheetNumber,
-    });
-  }, [activePanel.id, cutPlan, cutPlanId, sheetFromUrl, sheetIdx]);
-
-  const panelItems = useMemo(
-    () =>
-      panels.map((panel) => ({
-        id: panel.id,
-        name: panel.name,
-        partsCount: panel.parts.length,
-        hasCutPlan: panel.cutPlans.length > 0,
-      })),
-    [panels],
-  );
+    replaceWorkspaceQuery({ sheet: sheetNumber });
+  }, [cutPlan, cutPlanId, sheetFromUrl, sheetIdx]);
 
   const sheetWorkflowSteps = activeSheet
     ? buildOperatorWorkflowSteps(activeSheet.operations, activeSheet.placements)
     : [];
 
   const operationsSheetContext = activeSheet
-    ? resolveOperationsSheetContext(activeSheet, activePanel.parts)
+    ? resolveOperationsSheetContext(activeSheet, allParts)
     : null;
 
   const activePartId = activeSheet?.placements[0]?.partId ?? null;
@@ -128,12 +115,12 @@ function PanelWorkspaceInner({
   const groupedSheetIndices = useMemo(() => {
     if (!groupedPartId || !cutPlan) return null;
 
-    const part = activePanel.parts.find((item) => item.id === groupedPartId);
+    const part = allParts.find((item) => item.id === groupedPartId);
     if (!part || part.quantity < 2) return null;
 
     const indices = getSheetIndicesForPart(cutPlan.sheets, groupedPartId);
     return indices.length >= 2 ? indices : null;
-  }, [activePanel.parts, cutPlan, groupedPartId]);
+  }, [allParts, cutPlan, groupedPartId]);
 
   function handlePartSelect(partId: string) {
     if (!cutPlan) return;
@@ -142,10 +129,7 @@ function PanelWorkspaceInner({
     const firstSheet = cutPlan.sheets[sheetIndices[0] ?? -1];
     if (!firstSheet) return;
 
-    replaceWorkspaceQuery({
-      panel: activePanel.id,
-      sheet: firstSheet.sheetIndex,
-    });
+    replaceWorkspaceQuery({ sheet: firstSheet.sheetIndex });
   }
 
   function handleSheetIndexChange(index: number) {
@@ -154,16 +138,11 @@ function PanelWorkspaceInner({
     const sheetNumber = getSheetIndexParam(cutPlan.sheets, index);
     if (sheetNumber === null) return;
 
-    replaceWorkspaceQuery({
-      panel: activePanel.id,
-      sheet: sheetNumber,
-    });
+    replaceWorkspaceQuery({ sheet: sheetNumber });
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <PanelSelector panels={panelItems} activePanelId={activePanel.id} />
-
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-1.5 lg:px-4">
         {sheetContext ? (
           <p className="text-sm font-medium text-foreground">{sheetContext.label}</p>
@@ -193,7 +172,7 @@ function PanelWorkspaceInner({
           </PanelBlockHeader>
           <div className="min-h-0 flex-1 overflow-auto">
             <PartsPanel
-              parts={activePanel.parts}
+              parts={allParts}
               activePartId={activePartId}
               onPartSelect={handlePartSelect}
             />
@@ -201,14 +180,14 @@ function PanelWorkspaceInner({
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {!activeSheet ? (
+          {!activeSheet || !cutPlan ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-              Сменное задание для этой панели ещё не загружено
+              Сменное задание ещё не загружено
             </div>
           ) : (
             <SheetTabsPanel
               sheets={cutPlan.sheets}
-              parts={activePanel.parts}
+              parts={allParts}
               activeIndex={sheetIdx}
               onActiveIndexChange={handleSheetIndexChange}
               groupedSheetIndices={groupedSheetIndices}

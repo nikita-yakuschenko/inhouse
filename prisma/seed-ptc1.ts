@@ -78,6 +78,8 @@ async function main() {
     update: {
       name: "П(Ц)-1",
       description: "Спецификация внутренней плитной обшивки",
+      contractNumber: "Демо-001",
+      technology: "pkd",
       materialId: material.id,
       sheetFormatId: sheetFormat.id,
       machineProfileId: SEED_IDS.machineProfile,
@@ -89,6 +91,8 @@ async function main() {
       name: "П(Ц)-1",
       description: "Спецификация внутренней плитной обшивки",
       customerName: "Демо-производство",
+      contractNumber: "Демо-001",
+      technology: "pkd",
       materialId: material.id,
       sheetFormatId: sheetFormat.id,
       machineProfileId: SEED_IDS.machineProfile,

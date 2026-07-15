@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export type PanelListItem = {
   id: string;
   name: string;
+  code?: string | null;
   partsCount: number;
   hasCutPlan: boolean;
 };
@@ -53,8 +54,9 @@ export function PanelSelector({
             variant={panel.id === activePanelId ? "default" : "outline"}
             className={cn("shrink-0")}
             onClick={() => selectPanel(panel.id)}
+            title={panel.name}
           >
-            {panel.name}
+            {panel.code?.trim() || panel.name}
             <span className="ml-1 text-xs opacity-70">({panel.partsCount})</span>
           </Button>
         ))}

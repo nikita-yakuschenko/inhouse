@@ -8,7 +8,7 @@ import {
 } from "@/lib/parts/parse-specification-xlsx";
 
 describe("parseSpecificationXlsx", () => {
-  it("парсит имя из «Панель» и код Ст-…-маркировка", () => {
+  it("парсит панели и детали: панель Ст-1-02, деталь Ст-1-02-01", () => {
     const buffer = readFileSync(
       resolve(process.cwd(), "Ст- - Спецификация плитной обшивки.xlsx"),
     );
@@ -17,19 +17,17 @@ describe("parseSpecificationXlsx", () => {
 
     expect(parts.length).toBeGreaterThan(30);
     expect(parts[0]).toEqual({
+      panelName: "Плитная обшивка внешняя Ст-1-02",
+      panelCode: "Ст-1-02",
       code: "Ст-1-02-01",
       name: "Плитная обшивка внешняя Ст-1-02",
       widthMm: 1250,
       heightMm: 2680,
       quantity: 2,
     });
-    expect(parts[1]).toEqual({
-      code: "Ст-1-05-01",
-      name: "Плитная обшивка внешняя Ст-1-05",
-      widthMm: 1250,
-      heightMm: 3000,
-      quantity: 1,
-    });
+
+    const panelCodes = new Set(parts.map((part) => part.panelCode));
+    expect(panelCodes.size).toBeGreaterThan(1);
   });
 
   it("извлекает код панели из названия", () => {

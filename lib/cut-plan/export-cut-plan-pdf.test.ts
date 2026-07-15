@@ -16,6 +16,7 @@ describe("buildCutPlanPdfBytes", () => {
       {
         id: "pn01",
         name: "Панель П(Ц)-1",
+        code: null,
         parts: [],
         cutPlans: [
           {
@@ -118,6 +119,7 @@ describe("buildCutPlanPdfBytes", () => {
       {
         id: "pn01",
         name: "Панель 1",
+        code: null,
         parts: [],
         cutPlans: [
           {
@@ -208,6 +210,7 @@ describe("collectCutPlanPdfSheets", () => {
       {
         id: "pn01",
         name: "Панель 1",
+        code: "Ст-1-01",
         parts: [],
         cutPlans: [
           {
@@ -236,6 +239,7 @@ describe("collectCutPlanPdfSheets", () => {
       {
         id: "pn02",
         name: "Панель 2",
+        code: null,
         parts: [],
         cutPlans: [],
       },
@@ -243,7 +247,7 @@ describe("collectCutPlanPdfSheets", () => {
 
     expect(collectCutPlanPdfSheets(panels)).toEqual([
       {
-        panelName: "Панель 1",
+        panelName: "Ст-1-01",
         sheet: panels[0]!.cutPlans[0]!.sheets[0],
       },
     ]);

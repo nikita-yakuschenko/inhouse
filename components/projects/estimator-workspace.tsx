@@ -8,7 +8,6 @@ import { ExportCutPlanPdfButton } from "@/components/cut-plan/export-cut-plan-pd
 import { SheetTabsPanel } from "@/components/cut-plan/sheet-tabs-panel";
 import { EstimatorPartsSection } from "@/components/projects/estimator-parts-section";
 import { MaterialsSpecification } from "@/components/projects/materials-specification";
-import { PanelSelector } from "@/components/projects/panel-selector";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -84,14 +83,17 @@ function EstimatorWorkspaceInner({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const panelFromUrl = searchParams.get("panel");
   const sheetFromUrl = searchParams.get("sheet") ?? initialSheetParam;
   const tabFromUrl = searchParams.get("tab");
 
-  const activePanel =
-    panels.find((panel) => panel.id === panelFromUrl) ?? panels[0]!;
-
-  const cutPlan = activePanel.cutPlans[0] ?? null;
+  // Проект = один список деталей; марка стены только в коде (Ст-1-02-01).
+  const primaryPanel = panels[0]!;
+  const allParts = useMemo(
+    () => panels.flatMap((panel) => panel.parts),
+    [panels],
+  );
+  const cutPlan =
+    panels.find((panel) => panel.cutPlans[0])?.cutPlans[0] ?? null;
   const cutPlanId = cutPlan?.id ?? null;
 
   const activeTab: EstimatorTab =
@@ -103,8 +105,8 @@ function EstimatorWorkspaceInner({
     }
 
     const arrayIndex = findSheetArrayIndex(cutPlan.sheets, sheetFromUrl);
-    return applySheetSelection(activePanel.parts, cutPlan.sheets, arrayIndex);
-  }, [activePanel.id, activePanel.parts, cutPlan, cutPlanId, sheetFromUrl]);
+    return applySheetSelection(allParts, cutPlan.sheets, arrayIndex);
+  }, [allParts, cutPlan, cutPlanId, sheetFromUrl]);
 
   const activeSheet = cutPlan?.sheets[sheetIdx] ?? cutPlan?.sheets[0] ?? null;
 
@@ -127,31 +129,20 @@ function EstimatorWorkspaceInner({
     if (sheetNumber === null || sheetFromUrl === String(sheetNumber)) return;
 
     replaceQuery({
-      panel: activePanel.id,
       sheet: String(sheetNumber),
+      panel: null,
     });
-  }, [activePanel.id, cutPlan, cutPlanId, sheetFromUrl, sheetIdx]);
-
-  const panelItems = useMemo(
-    () =>
-      panels.map((panel) => ({
-        id: panel.id,
-        name: panel.name,
-        partsCount: panel.parts.length,
-        hasCutPlan: panel.cutPlans.length > 0,
-      })),
-    [panels],
-  );
+  }, [cutPlan, cutPlanId, sheetFromUrl, sheetIdx]);
 
   const groupedSheetIndices = useMemo(() => {
     if (!groupedPartId || !cutPlan) return null;
 
-    const part = activePanel.parts.find((item) => item.id === groupedPartId);
+    const part = allParts.find((item) => item.id === groupedPartId);
     if (!part || part.quantity < 2) return null;
 
     const indices = getSheetIndicesForPart(cutPlan.sheets, groupedPartId);
     return indices.length >= 2 ? indices : null;
-  }, [activePanel.parts, cutPlan, groupedPartId]);
+  }, [allParts, cutPlan, groupedPartId]);
 
   function handleSheetIndexChange(index: number) {
     if (!cutPlan) return;
@@ -160,9 +151,9 @@ function EstimatorWorkspaceInner({
     if (sheetNumber === null) return;
 
     replaceQuery({
-      panel: activePanel.id,
       sheet: String(sheetNumber),
       tab: "cut",
+      panel: null,
     });
   }
 
@@ -172,16 +163,12 @@ function EstimatorWorkspaceInner({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <PanelSelector panels={panelItems} activePanelId={activePanel.id} />
-
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3 lg:px-6">
         <div className="min-w-0">
           {sheetContext ? (
             <p className="text-sm font-medium text-foreground">{sheetContext.label}</p>
           ) : null}
-          <p className="text-xs text-muted-foreground">
-            Панель: {activePanel.name} · {activePanel.parts.length} дет.
-          </p>
+          <p className="text-xs text-muted-foreground">{allParts.length} дет.</p>
         </div>
 
         {cutPlan ? (
@@ -219,8 +206,8 @@ function EstimatorWorkspaceInner({
           <TabsContent value="parts" className="mt-4 min-h-0 flex-1">
             <EstimatorPartsSection
               projectId={projectId}
-              panelId={activePanel.id}
-              parts={activePanel.parts}
+              panelId={primaryPanel.id}
+              parts={allParts}
             />
           </TabsContent>
 
@@ -235,7 +222,7 @@ function EstimatorWorkspaceInner({
                 <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
                   <SheetTabsPanel
                     sheets={cutPlan.sheets}
-                    parts={activePanel.parts}
+                    parts={allParts}
                     activeIndex={sheetIdx}
                     onActiveIndexChange={handleSheetIndexChange}
                     groupedSheetIndices={groupedSheetIndices}
@@ -248,7 +235,7 @@ function EstimatorWorkspaceInner({
           <TabsContent value="spec" className="mt-4 min-h-0 flex-1">
             <MaterialsSpecification
               sheetContext={sheetContext}
-              parts={activePanel.parts}
+              parts={allParts}
               cutPlan={cutPlan}
             />
           </TabsContent>

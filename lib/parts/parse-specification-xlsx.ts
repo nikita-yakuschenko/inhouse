@@ -3,8 +3,14 @@ import * as XLSX from "xlsx";
 import { extractPanelCode } from "@/lib/parts/part-marking";
 
 export type ParsedSpecificationPart = {
-  name: string;
+  /** Полное имя обшивки/панели из колонки «Панель». */
+  panelName: string;
+  /** Код стены/панели: Ст-1-02. */
+  panelCode: string;
+  /** Код детали: Ст-1-02-01. */
   code: string;
+  /** Имя детали — то же, что панель (тип обшивки). */
+  name: string;
   widthMm: number;
   heightMm: number;
   quantity: number;
@@ -73,16 +79,6 @@ function parseMarking(value: unknown): string | null {
   return text;
 }
 
-function buildPartCode(panelName: string, marking: string): string {
-  const panelCode = extractPanelCode(panelName);
-  if (!panelCode) {
-    throw new Error(
-      `В названии панели нет кода вида «Ст-…»: «${panelName}»`,
-    );
-  }
-  return `${panelCode}-${marking}`;
-}
-
 export function parseSpecificationXlsx(
   buffer: ArrayBuffer | Buffer,
 ): ParsedSpecificationPart[] {
@@ -115,8 +111,17 @@ export function parseSpecificationXlsx(
 
     if (!marking || !widthMm || !heightMm || !quantity || !panelName) continue;
 
+    const panelCode = extractPanelCode(panelName);
+    if (!panelCode) {
+      throw new Error(
+        `В названии панели нет кода вида «Ст-…»: «${panelName}»`,
+      );
+    }
+
     parts.push({
-      code: buildPartCode(panelName, marking),
+      panelName,
+      panelCode,
+      code: `${panelCode}-${marking}`,
       name: panelName,
       widthMm,
       heightMm,

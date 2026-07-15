@@ -1,8 +1,11 @@
 import type { ProjectStatus } from "@/app/generated/prisma/client";
+import type { ProjectTechnologyValue } from "@/lib/projects/technology";
 
 export type ProjectListRow = {
   id: string;
   name: string;
+  contractNumber: string | null;
+  technology: ProjectTechnologyValue | null;
   status: ProjectStatus;
   panelsCount: number;
   partsCount: number;
@@ -13,6 +16,8 @@ export type ProjectListRow = {
 type ProjectForList = {
   id: string;
   name: string;
+  contractNumber: string | null;
+  technology: ProjectTechnologyValue | null;
   status: ProjectStatus;
   updatedAt: Date;
   panels: {
@@ -27,6 +32,8 @@ export function serializeProjectListRows(projects: ProjectForList[]): ProjectLis
     return {
       id: project.id,
       name: project.name,
+      contractNumber: project.contractNumber,
+      technology: project.technology,
       status: project.status,
       panelsCount: project.panels.length,
       partsCount: parts.length,

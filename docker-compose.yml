@@ -1,25 +1,10 @@
+# Приложение Smartcut. Postgres — отдельный сервис в Dokploy, не здесь.
+# В Dokploy / .env задайте DATABASE_URL на вашу БД, например:
+# postgresql://cutting:SECRET@smartcut-postgres:5432/cutting
+
 name: smartcut-inhouse
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: cutting-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: cutting
-      POSTGRES_PASSWORD: cutting
-      POSTGRES_DB: cutting
-    ports:
-      - "55432:5432"
-    volumes:
-      # Именованный volume — переживает redeploy (не down -v!)
-      - cutting_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cutting -d cutting"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   app:
     build: .
     container_name: cutting-app
@@ -27,11 +12,6 @@ services:
     ports:
       - "3300:3000"
     environment:
-      DATABASE_URL: postgresql://cutting:cutting@postgres:5432/cutting
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  cutting_pg_data:
-    name: cutting_pg_data
+      DATABASE_URL: ${DATABASE_URL}
+    # Без локальной БД в этом compose приложение не стартует,
+    # пока DATABASE_URL не указывает на доступный Postgres.

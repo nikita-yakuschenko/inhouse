@@ -1,0 +1,28 @@
+# Опционально: локальная Postgres только для разработки на машине.
+# docker compose -f docker-compose.db.yml up -d
+# Затем в .env: DATABASE_URL=postgresql://cutting:cutting@localhost:55432/cutting
+
+name: smartcut-db-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cutting-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cutting
+      POSTGRES_PASSWORD: cutting
+      POSTGRES_DB: cutting
+    ports:
+      - "55432:5432"
+    volumes:
+      - cutting_pg_data_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cutting -d cutting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cutting_pg_data_local:
+    name: cutting_pg_data_local

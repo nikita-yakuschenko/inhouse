@@ -54,7 +54,7 @@ export function EstimatorPartsSection({
         </div>
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
           <Button type="submit">Добавить деталь</Button>
-          <ImportPartsButton projectId={projectId} panelId={panelId} />
+          <ImportPartsButton projectId={projectId} />
         </div>
       </form>
 

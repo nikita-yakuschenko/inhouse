@@ -8,13 +8,7 @@ import { toast } from "sonner";
 import { importPartsFromXlsxAction } from "@/features/parts/actions";
 import { Button } from "@/components/ui/button";
 
-export function ImportPartsButton({
-  projectId,
-  panelId,
-}: {
-  projectId: string;
-  panelId: string;
-}) {
+export function ImportPartsButton({ projectId }: { projectId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
@@ -30,7 +24,6 @@ export function ImportPartsButton({
 
     const formData = new FormData();
     formData.set("projectId", projectId);
-    formData.set("panelId", panelId);
     formData.set("file", file);
 
     startTransition(async () => {
