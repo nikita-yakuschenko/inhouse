@@ -19,6 +19,7 @@ import {
   IconSearch,
 } from "@tabler/icons-react";
 
+import { DeleteProjectButton } from "@/components/projects/delete-project-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,7 @@ export function EstimatorCalculationsTable({
         accessorKey: "name",
         header: ({ column }) => <SortableHeader column={column}>Проект</SortableHeader>,
         cell: ({ row }) => (
-          <div className="min-w-[12rem]">
+          <div className="min-w-48">
             <p className="font-medium">{row.original.name}</p>
             <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
               {row.original.id}
@@ -124,6 +125,19 @@ export function EstimatorCalculationsTable({
             {formatProjectUpdatedAt(row.original.updatedAt)}
           </span>
         ),
+      },
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Действия</span>,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <DeleteProjectButton
+              projectId={row.original.id}
+              projectName={row.original.name}
+            />
+          </div>
+        ),
+        enableSorting: false,
       },
     ],
     [],

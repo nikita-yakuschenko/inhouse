@@ -7,12 +7,14 @@ import { getOperatorCutOperations } from "@/lib/cut-plan/operator-operations";
 import { buildOffcutHatchSvg } from "@/lib/cut-plan/offcut-hatch-svg";
 import { SVG_FONT_FAMILY } from "@/lib/cut-plan/pdf-font";
 import {
+  buildOffcutLabelLayout,
   buildPartLabelLayout,
   LABEL_BADGE_FILL,
   LABEL_BADGE_RADIUS_MM,
   LABEL_BADGE_STROKE_MM,
   sortOffcutsForLabeling,
   type LabelBadge,
+  type OffcutLabelLayout,
   type PartLabelLayout,
   type PartLabelText,
 } from "@/lib/cut-plan/part-label-layout";
@@ -100,6 +102,20 @@ function renderLabelLayout(layout: PartLabelLayout, fill = PART_LABEL_FILL) {
   return parts.join("");
 }
 
+function renderOffcutLabelLayout(layout: OffcutLabelLayout, fill = OFFCUT_LABEL_FILL) {
+  if (layout.type === "inline") {
+    return renderLabelLayout(layout.layout, fill);
+  }
+
+  return [
+    `<line x1="${layout.anchorXMm}" y1="${layout.anchorYMm}" x2="${layout.leaderEndXMm}" y2="${layout.leaderEndYMm}" stroke="${fill}" stroke-width="2" />`,
+    `<circle cx="${layout.anchorXMm}" cy="${layout.anchorYMm}" r="6" fill="${fill}" />`,
+    labelBadgeRect(layout.badge, fill),
+    labelText(layout.marking, fill, true),
+    layout.size.text ? labelText(layout.size, fill, true) : "",
+  ].join("");
+}
+
 export function buildSheetMapSvg(input: SheetMapSvgInput): string {
   const operatorSheet = getOperatorSheetSize(input.widthMm, input.heightMm);
   const canvasViewBox = getOperatorCanvasViewBox(input.widthMm, input.heightMm);
@@ -112,7 +128,7 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
       widthMm: input.usableWidthMm,
       heightMm: input.usableHeightMm,
     },
-    input.widthMm,
+    input.heightMm,
   );
 
   const cutOperations = getOperatorCutOperations(input.operations);
@@ -120,22 +136,34 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
 
   const offcutShapes = labeledOffcuts
     .map((offcut, index) => {
-      const rect = engineRectToOperatorSvg(offcut, input.widthMm);
+      const rect = engineRectToOperatorSvg(offcut, input.heightMm);
       const marking = String(index + 1);
-      const labelLayout = buildPartLabelLayout(rect, marking, offcut.widthMm, offcut.heightMm);
+      const labelLayout = buildOffcutLabelLayout(
+        rect,
+        marking,
+        offcut.widthMm,
+        offcut.heightMm,
+        operatorSheet,
+        {
+          xMm: canvasViewBox.xMm,
+          yMm: canvasViewBox.yMm,
+          widthMm: canvasViewBox.widthMm,
+          heightMm: canvasViewBox.heightMm,
+        },
+      );
       const clipId = `offcut-clip-${input.mapId}-${index}`;
 
       return `<g>
         ${buildOffcutHatchSvg(rect, clipId)}
         <rect x="${rect.xMm}" y="${rect.yMm}" width="${rect.widthMm}" height="${rect.heightMm}" fill="none" stroke="${offcut.isUseful ? "#64748b" : "#94a3b8"}" stroke-width="1.5" />
-        ${renderLabelLayout(labelLayout, OFFCUT_LABEL_FILL)}
+        ${renderOffcutLabelLayout(labelLayout)}
       </g>`;
     })
     .join("");
 
   const placementShapes = input.placements
     .map((placement) => {
-      const rect = engineRectToOperatorSvg(placement, input.widthMm);
+      const rect = engineRectToOperatorSvg(placement, input.heightMm);
       const marking = resolvePlacementMarking(placement.label, placement.partInstanceIndex);
       const labelLayout = buildPartLabelLayout(
         rect,
@@ -158,11 +186,11 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
           .map((operation) => {
             const p1 = enginePointToOperatorSvg(
               { xMm: operation.x1Mm ?? 0, yMm: operation.y1Mm ?? 0 },
-              input.widthMm,
+              input.heightMm,
             );
             const p2 = enginePointToOperatorSvg(
               { xMm: operation.x2Mm ?? 0, yMm: operation.y2Mm ?? 0 },
-              input.widthMm,
+              input.heightMm,
             );
 
             return `<line x1="${p1.xMm}" y1="${p1.yMm}" x2="${p2.xMm}" y2="${p2.yMm}" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="16 10" />`;

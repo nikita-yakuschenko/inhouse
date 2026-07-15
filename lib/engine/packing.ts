@@ -297,8 +297,8 @@ export function chooseAxis(
   if (machine.preferredPrimaryAxis === "vertical") return "vertical";
   if (machine.preferredPrimaryAxis === "horizontal") return "horizontal";
 
-  const verticalSheets = packPartsSequentially(instances, usable, machine.kerfMm, "vertical");
-  const horizontalSheets = packPartsSequentially(instances, usable, machine.kerfMm, "horizontal");
+  const verticalSheets = packParts(instances, usable, machine.kerfMm, "vertical");
+  const horizontalSheets = packParts(instances, usable, machine.kerfMm, "horizontal");
 
   return verticalSheets.length <= horizontalSheets.length ? "vertical" : "horizontal";
 }

@@ -327,7 +327,7 @@ model Placement {
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   cutPlanSheet CutPlanSheet @relation(fields: [cutPlanSheetId], references: [id], onDelete: Cascade)
-  part         Part         @relation(fields: [partId], references: [id])
+  part         Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
 
   @@map("placements")
 }

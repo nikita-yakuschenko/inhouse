@@ -1,3 +1,9 @@
+"use client";
+
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 import { createProjectAction } from "@/features/projects/actions";
 import type { MachineProfile, Material, SheetFormat } from "@/app/generated/prisma/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +14,7 @@ import { cn } from "@/lib/utils";
 const fieldClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
   "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-  "disabled:cursor-not-allowed disabled:opacity-50"
+  "disabled:cursor-not-allowed disabled:opacity-50",
 );
 
 export function CreateProjectForm({
@@ -22,6 +28,9 @@ export function CreateProjectForm({
   machineProfiles: MachineProfile[];
   submitLabel?: string;
 }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
   const catalogReady =
     materials.length > 0 && sheetFormats.length > 0 && machineProfiles.length > 0;
 
@@ -54,8 +63,23 @@ npm run db:seed`}
     );
   }
 
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await createProjectAction(formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Расчёт создан", {
+        description: result.name,
+      });
+      router.push(`/projects/${result.projectId}`);
+    });
+  }
+
   return (
-    <form action={createProjectAction} className="grid gap-4">
+    <form action={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="name">Название проекта</Label>
         <Input
@@ -63,6 +87,7 @@ npm run db:seed`}
           name="name"
           required
           placeholder="Например, ГКЛ офис 204"
+          disabled={pending}
         />
       </div>
 
@@ -74,6 +99,7 @@ npm run db:seed`}
           required
           defaultValue={defaultMaterial}
           className={fieldClassName}
+          disabled={pending}
         >
           {materials.map((material) => (
             <option key={material.id} value={material.id}>
@@ -92,6 +118,7 @@ npm run db:seed`}
             required
             defaultValue={defaultSheet}
             className={fieldClassName}
+            disabled={pending}
           >
             {sheetFormats.map((sheet) => (
               <option key={sheet.id} value={sheet.id}>
@@ -108,6 +135,7 @@ npm run db:seed`}
             required
             defaultValue={defaultMachine}
             className={fieldClassName}
+            disabled={pending}
           >
             {machineProfiles.map((machine) => (
               <option key={machine.id} value={machine.id}>
@@ -125,11 +153,12 @@ npm run db:seed`}
           name="description"
           rows={3}
           className={cn(fieldClassName, "h-auto min-h-20 py-2")}
+          disabled={pending}
         />
       </div>
 
-      <Button type="submit" className="w-fit">
-        {submitLabel}
+      <Button type="submit" className="w-fit" disabled={pending}>
+        {pending ? "Создание…" : submitLabel}
       </Button>
     </form>
   );

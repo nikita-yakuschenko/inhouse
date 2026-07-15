@@ -90,10 +90,58 @@ describe("buildCutPlanPdfBytes", () => {
 
     expect(text.startsWith("%PDF-")).toBe(true);
     expect(pdfDoc.getPageCount()).toBe(1);
+    const pageSize = pdfDoc.getPage(0)!.getSize();
+    expect(pageSize.width).toBeCloseTo((297 * 72) / 25.4, 1);
+    expect(pageSize.height).toBeCloseTo((210 * 72) / 25.4, 1);
     expect(text).not.toMatch(/\/Subtype\s*\/Image/);
     expect(text).not.toMatch(/\/DCTDecode/);
     expect(bytes.length).toBeGreaterThan(5_000);
     expect(bytes.length).toBeLessThan(500_000);
+  });
+
+  it("даёт одну страницу A4 на каждый лист заготовки", async () => {
+    const makeSheet = (sheetIndex: number) => ({
+      id: `sh${sheetIndex}`,
+      sheetIndex,
+      widthMm: 2500,
+      heightMm: 1250,
+      usableXmm: 5,
+      usableYmm: 5,
+      usableWidthMm: 2490,
+      usableHeightMm: 1240,
+      placements: [] as ClientPanel["cutPlans"][0]["sheets"][0]["placements"],
+      operations: [] as ClientPanel["cutPlans"][0]["sheets"][0]["operations"],
+      plannedOffcuts: [] as ClientPanel["cutPlans"][0]["sheets"][0]["plannedOffcuts"],
+    });
+
+    const panels: ClientPanel[] = [
+      {
+        id: "pn01",
+        name: "Панель 1",
+        parts: [],
+        cutPlans: [
+          {
+            id: "cp01",
+            totalSheetsCount: 3,
+            totalOperationsCount: 0,
+            wastePercent: 10,
+            sheets: [makeSheet(1), makeSheet(2), makeSheet(3)],
+          },
+        ],
+      },
+    ];
+
+    const bytes = await buildCutPlanPdfBytes(
+      {
+        projectName: "Тест 3 листа",
+        projectId: "pr02",
+        materialLabel: "ЛДСП 16 мм",
+      },
+      collectCutPlanPdfSheets(panels),
+    );
+
+    const pdfDoc = await PDFDocument.load(bytes);
+    expect(pdfDoc.getPageCount()).toBe(3);
   });
 });
 

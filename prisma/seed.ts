@@ -30,7 +30,12 @@ async function main() {
 
   const sheetFormat = await prisma.sheetFormat.upsert({
     where: { id: SEED_IDS.sheetFormat },
-    update: {},
+    update: {
+      trimLeftMm: 0,
+      trimRightMm: 0,
+      trimTopMm: 0,
+      trimBottomMm: 0,
+    },
     create: {
       id: SEED_IDS.sheetFormat,
       organizationId: organization.id,
@@ -39,10 +44,11 @@ async function main() {
       widthMm: 2500,
       heightMm: 1250,
       thicknessMm: 13,
-      trimLeftMm: 5,
-      trimRightMm: 5,
-      trimTopMm: 5,
-      trimBottomMm: 5,
+      // Заводской лист — без технологической подрезки кромок
+      trimLeftMm: 0,
+      trimRightMm: 0,
+      trimTopMm: 0,
+      trimBottomMm: 0,
       isDefault: true,
       isActive: true,
     },

@@ -10,16 +10,16 @@ import {
 } from "@/lib/cut-plan/operator-view";
 
 describe("operator-view", () => {
-  it("rotates sheet to landscape for operator", () => {
-    expect(getOperatorSheetSize(1250, 2500)).toEqual({
+  it("оставляет лист альбомным как на станке", () => {
+    expect(getOperatorSheetSize(2500, 1250)).toEqual({
       widthMm: 2500,
       heightMm: 1250,
     });
   });
 
   it("adds safe padding around sheet in viewBox", () => {
-    expect(getOperatorCanvasPaddingMm(1250, 2500)).toBe(100);
-    expect(getOperatorCanvasViewBox(1250, 2500)).toEqual({
+    expect(getOperatorCanvasPaddingMm(2500, 1250)).toBe(100);
+    expect(getOperatorCanvasViewBox(2500, 1250)).toEqual({
       paddingMm: 100,
       xMm: -100,
       yMm: -100,
@@ -28,18 +28,18 @@ describe("operator-view", () => {
     });
   });
 
-  it("maps bottom part to left strip at bottom in operator coords", () => {
+  it("maps engine coords without axis swap", () => {
     const part = engineRectToOperator({
       xMm: 0,
       yMm: 0,
       widthMm: 900,
-      heightMm: 1330,
+      heightMm: 400,
     });
     expect(part).toEqual({
       xMm: 0,
       yMm: 0,
-      widthMm: 1330,
-      heightMm: 900,
+      widthMm: 900,
+      heightMm: 400,
     });
   });
 
@@ -49,43 +49,43 @@ describe("operator-view", () => {
         xMm: 0,
         yMm: 0,
         widthMm: 900,
-        heightMm: 1330,
+        heightMm: 400,
       },
       1250,
     );
     expect(part).toEqual({
       xMm: 0,
-      yMm: 350,
-      widthMm: 1330,
-      heightMm: 900,
+      yMm: 850,
+      widthMm: 900,
+      heightMm: 400,
     });
   });
 
-  it("maps offcut along feed to right of part in svg", () => {
+  it("maps offcut above part higher on sheet to top of svg", () => {
     const offcut = engineRectToOperatorSvg(
       {
         xMm: 0,
-        yMm: 1330,
+        yMm: 400,
         widthMm: 900,
-        heightMm: 1170,
+        heightMm: 850,
       },
       1250,
     );
     expect(offcut).toEqual({
-      xMm: 1330,
-      yMm: 350,
-      widthMm: 1170,
-      heightMm: 900,
+      xMm: 0,
+      yMm: 0,
+      widthMm: 900,
+      heightMm: 850,
     });
   });
 
-  it("maps depth cut to horizontal line in svg", () => {
+  it("maps point near fence to bottom of svg", () => {
     const cut = enginePointToOperatorSvg({ xMm: 900, yMm: 0 }, 1250);
-    expect(cut).toEqual({ xMm: 0, yMm: 350 });
+    expect(cut).toEqual({ xMm: 900, yMm: 1250 });
   });
 
-  it("maps horizontal cut position from fence in operator coords", () => {
-    const cut = enginePointToOperator({ xMm: 0, yMm: 1330 });
-    expect(cut.xMm).toBe(1330);
+  it("keeps feed position on X for horizontal cut hint", () => {
+    const cut = enginePointToOperator({ xMm: 0, yMm: 400 });
+    expect(cut.yMm).toBe(400);
   });
 });

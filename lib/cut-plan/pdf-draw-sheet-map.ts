@@ -4,10 +4,12 @@ import { degrees, rgb } from "pdf-lib";
 import type { ClientCutOperation, ClientPlacement, ClientPlannedOffcut } from "@/features/projects/serialize-panels";
 import { getOperatorCutOperations } from "@/lib/cut-plan/operator-operations";
 import {
+  buildOffcutLabelLayout,
   buildPartLabelLayout,
   LABEL_BADGE_STROKE_MM,
   sortOffcutsForLabeling,
   type LabelBadge,
+  type OffcutLabelLayout,
   type PartLabelLayout,
   type PartLabelText,
 } from "@/lib/cut-plan/part-label-layout";
@@ -171,6 +173,44 @@ function drawLabelLayout(
   }
 }
 
+function drawOffcutLabelLayout(
+  page: PDFPage,
+  layout: OffcutLabelLayout,
+  fonts: PdfDocumentFonts,
+  color: PdfRgb,
+  mapper: ReturnType<typeof createMapCoordinateMapper>,
+) {
+  if (layout.type === "inline") {
+    drawLabelLayout(page, layout.layout, fonts, color, mapper);
+    return;
+  }
+
+  drawSvgLine(
+    page,
+    layout.anchorXMm,
+    layout.anchorYMm,
+    layout.leaderEndXMm,
+    layout.leaderEndYMm,
+    mapper,
+    { color, widthMm: 2 },
+  );
+
+  const anchor = mapper.mapPoint(layout.anchorXMm, layout.anchorYMm);
+  const radiusPt = mapper.mapLength(6);
+  page.drawCircle({
+    x: anchor.x,
+    y: anchor.y,
+    size: radiusPt,
+    color: toColor(color),
+  });
+
+  drawBadge(page, layout.badge, color, mapper);
+  drawLabelText(page, layout.marking, layout.marking.text, fonts, color, mapper, true);
+  if (layout.size.text) {
+    drawLabelText(page, layout.size, layout.size.text, fonts, color, mapper, true);
+  }
+}
+
 function drawRotatedBadge(
   page: PDFPage,
   anchor: PartLabelText,
@@ -260,22 +300,34 @@ export function drawCutMapSheet(
         widthMm: sheet.usableWidthMm,
         heightMm: sheet.usableHeightMm,
       },
-      sheet.widthMm,
+      sheet.heightMm,
     ),
     mapper,
     { borderColor: PDF_COLORS.usableStroke, borderWidthMm: 1.5, dashArray: [8, 5] },
   );
 
   for (const [index, offcut] of sortOffcutsForLabeling(sheet.plannedOffcuts).entries()) {
-    const rect = engineRectToOperatorSvg(offcut, sheet.widthMm);
+    const rect = engineRectToOperatorSvg(offcut, sheet.heightMm);
     drawOffcutHatch(page, rect, mapper);
     drawSvgRect(page, rect, mapper, {
       borderColor: offcut.isUseful ? PDF_COLORS.offcutStroke : PDF_COLORS.usableStroke,
       borderWidthMm: 1.5,
     });
-    drawLabelLayout(
+    drawOffcutLabelLayout(
       page,
-      buildPartLabelLayout(rect, String(index + 1), offcut.widthMm, offcut.heightMm),
+      buildOffcutLabelLayout(
+        rect,
+        String(index + 1),
+        offcut.widthMm,
+        offcut.heightMm,
+        operatorSheet,
+        {
+          xMm: viewBox.xMm,
+          yMm: viewBox.yMm,
+          widthMm: viewBox.widthMm,
+          heightMm: viewBox.heightMm,
+        },
+      ),
       fonts,
       PDF_COLORS.offcutLabel,
       mapper,
@@ -283,7 +335,7 @@ export function drawCutMapSheet(
   }
 
   for (const placement of sheet.placements) {
-    const rect = engineRectToOperatorSvg(placement, sheet.widthMm);
+    const rect = engineRectToOperatorSvg(placement, sheet.heightMm);
     const marking = resolvePlacementMarking(placement.label, placement.partInstanceIndex);
     drawSvgRect(page, rect, mapper, {
       fillColor: PDF_COLORS.partFill,
@@ -302,11 +354,11 @@ export function drawCutMapSheet(
   for (const operation of getOperatorCutOperations(sheet.operations)) {
     const p1 = enginePointToOperatorSvg(
       { xMm: operation.x1Mm ?? 0, yMm: operation.y1Mm ?? 0 },
-      sheet.widthMm,
+      sheet.heightMm,
     );
     const p2 = enginePointToOperatorSvg(
       { xMm: operation.x2Mm ?? 0, yMm: operation.y2Mm ?? 0 },
-      sheet.widthMm,
+      sheet.heightMm,
     );
     drawSvgLine(page, p1.xMm, p1.yMm, p2.xMm, p2.yMm, mapper, {
       color: PDF_COLORS.cutLine,

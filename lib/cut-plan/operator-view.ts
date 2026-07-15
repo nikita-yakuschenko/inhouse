@@ -1,5 +1,5 @@
-/** Преобразование координат движка (лист стоит, origin снизу-слева) в вид оператора:
- *  лист на схеме горизонтально — длинная сторона вдоль подачи на вертикальном станке. */
+/** Координаты движка → вид оператора: лист на станке горизонтально (альбом).
+ *  Origin движка снизу-слева; SVG — сверху-слева, нижний край листа = опора. */
 
 export type MmRect = {
   xMm: number;
@@ -13,11 +13,11 @@ export type MmPoint = {
   yMm: number;
 };
 
-/** Размеры листа на схеме оператора (ширина = бывшая высота листа). */
+/** Размеры листа на схеме: как на станке, без поворота осей. */
 export function getOperatorSheetSize(sheetWidthMm: number, sheetHeightMm: number) {
   return {
-    widthMm: sheetHeightMm,
-    heightMm: sheetWidthMm,
+    widthMm: sheetWidthMm,
+    heightMm: sheetHeightMm,
   };
 }
 
@@ -42,21 +42,13 @@ export function getOperatorCanvasViewBox(sheetWidthMm: number, sheetHeightMm: nu
   };
 }
 
-/** Координаты оператора: origin снизу-слева, длина листа — по X (подача). */
+/** Без смены осей: X вдоль длины листа, Y от нижнего упора вверх. */
 export function engineRectToOperator(rect: MmRect): MmRect {
-  return {
-    xMm: rect.yMm,
-    yMm: rect.xMm,
-    widthMm: rect.heightMm,
-    heightMm: rect.widthMm,
-  };
+  return { ...rect };
 }
 
 export function enginePointToOperator(point: MmPoint): MmPoint {
-  return {
-    xMm: point.yMm,
-    yMm: point.xMm,
-  };
+  return { ...point };
 }
 
 /** SVG: origin сверху-слева; нижний край листа = опора станка. */
@@ -79,15 +71,16 @@ export function operatorPointToSvg(
   };
 }
 
-export function engineRectToOperatorSvg(rect: MmRect, sheetWidthMm: number): MmRect {
-  return operatorRectToSvg(engineRectToOperator(rect), sheetWidthMm);
+/** sheetHeightMm — высота листа в мм (для переворота оси Y в SVG). */
+export function engineRectToOperatorSvg(rect: MmRect, sheetHeightMm: number): MmRect {
+  return operatorRectToSvg(engineRectToOperator(rect), sheetHeightMm);
 }
 
 export function enginePointToOperatorSvg(
   point: MmPoint,
-  sheetWidthMm: number,
+  sheetHeightMm: number,
 ): MmPoint {
-  return operatorPointToSvg(enginePointToOperator(point), sheetWidthMm);
+  return operatorPointToSvg(enginePointToOperator(point), sheetHeightMm);
 }
 
 export function formatOperationHint(operation: {
@@ -106,16 +99,14 @@ export function formatOperationHint(operation: {
   if (operation.operationType === "full_cut" && operation.axis === "horizontal") {
     const y = operation.y1Mm ?? operation.y2Mm;
     if (y !== null) {
-      const pos = enginePointToOperator({ xMm: 0, yMm: y });
-      return `Поперечный рез на ${pos.xMm} мм от упора (вдоль ширины листа)`;
+      return `Поперечный рез на ${y} мм от упора`;
     }
   }
 
   if (operation.operationType === "full_cut" && operation.axis === "vertical") {
     const x = operation.x1Mm ?? operation.x2Mm;
     if (x !== null) {
-      const pos = enginePointToOperator({ xMm: x, yMm: 0 });
-      return `Продольный рез на ${pos.xMm} мм от упора`;
+      return `Продольный рез на ${x} мм от упора`;
     }
   }
 

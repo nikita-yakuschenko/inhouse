@@ -34,7 +34,7 @@ const baseInput: EngineInput = {
 };
 
 describe("runCuttingEngine", () => {
-  it("выделяет отдельный лист на каждый экземпляр детали", () => {
+  it("раскладывает несколько деталей на один лист", () => {
     const result = runCuttingEngine({
       ...baseInput,
       parts: [
@@ -64,9 +64,36 @@ describe("runCuttingEngine", () => {
     });
 
     expect(result.status).toBe("success");
-    expect(result.metrics.sheetsCount).toBe(3);
-    expect(result.sheets.every((sheet) => sheet.placements.length === 1)).toBe(true);
+    expect(result.metrics.sheetsCount).toBe(1);
+    expect(result.sheets[0]?.placements).toHaveLength(3);
     expect(result.sheets[0]?.operations.length).toBeGreaterThan(0);
+  });
+
+  it("для 220 деталей 200x200 на 2500x1250 использует несколько деталей на лист", () => {
+    const result = runCuttingEngine({
+      ...baseInput,
+      parts: [
+        {
+          id: "p1",
+          name: "Квадрат",
+          quantity: 220,
+          widthMm: 200,
+          heightMm: 200,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+      ],
+    });
+
+    expect(result.status).toBe("success");
+    // usable 2490x1240, kerf 4 → до 12×6 = 72 на лист → ceil(220/72) = 4
+    expect(result.metrics.sheetsCount).toBe(4);
+    expect(result.sheets[0]?.placements.length).toBeGreaterThan(1);
+    expect(
+      result.sheets.reduce((sum, sheet) => sum + sheet.placements.length, 0),
+    ).toBe(220);
   });
 
   it("учитывает kerf и trim в рабочей зоне", () => {

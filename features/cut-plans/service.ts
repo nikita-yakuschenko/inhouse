@@ -20,126 +20,130 @@ async function saveCutPlanResult(params: {
     throw new Error(result.errors?.join(" ") ?? "Расчёт завершился с ошибкой");
   }
 
-  const cutPlan = await prisma.$transaction(async (tx) => {
-    await tx.cutPlan.deleteMany({ where: { panelId } });
+  // createMany вместо поштучных create — иначе крупные раскрои не укладываются в timeout
+  const cutPlan = await prisma.$transaction(
+    async (tx) => {
+      await tx.cutPlan.deleteMany({ where: { panelId } });
 
-    const createdPlan = await tx.cutPlan.create({
-      data: {
-        id: generateEntityId(),
-        projectId,
-        panelId,
-        machineProfileId,
-        status: "calculated",
-        algorithmVersion: result.algorithmVersion,
-        score: result.score,
-        totalSheetsCount: result.metrics.sheetsCount,
-        totalMaterialAreaMm2: BigInt(
-          result.sheets.reduce(
-            (sum, sheet) => sum + sheet.usableWidthMm * sheet.usableHeightMm,
-            0,
-          ),
-        ),
-        totalPartsAreaMm2: BigInt(result.metrics.partsAreaMm2),
-        totalWasteAreaMm2: BigInt(result.metrics.wasteAreaMm2),
-        usefulOffcutsAreaMm2: BigInt(
-          result.sheets.reduce(
-            (sum, sheet) =>
-              sum +
-              sheet.offcuts
-                .filter((offcut) => offcut.isUseful)
-                .reduce((offcutSum, offcut) => offcutSum + offcut.areaMm2, 0),
-            0,
-          ),
-        ),
-        wastePercent: result.metrics.wastePercent,
-        totalOperationsCount: result.metrics.operationsCount,
-        totalSetupChangesCount: result.metrics.setupChangesCount,
-        totalManualOperationsCount: result.metrics.manualOperationsCount,
-        settingsJson: JSON.parse(JSON.stringify(engineInput.settings)),
-      },
-    });
-
-    for (const sheet of result.sheets) {
-      const createdSheet = await tx.cutPlanSheet.create({
+      const createdPlan = await tx.cutPlan.create({
         data: {
           id: generateEntityId(),
-          cutPlanId: createdPlan.id,
-          sourceType: "full_sheet",
-          sourceSheetFormatId: sheetFormatId,
-          sheetIndex: sheet.sheetIndex,
-          widthMm: sheet.widthMm,
-          heightMm: sheet.heightMm,
-          usableXmm: sheet.usableXmm,
-          usableYmm: sheet.usableYmm,
-          usableWidthMm: sheet.usableWidthMm,
-          usableHeightMm: sheet.usableHeightMm,
-          materialId,
+          projectId,
+          panelId,
+          machineProfileId,
+          status: "calculated",
+          algorithmVersion: result.algorithmVersion,
+          score: result.score,
+          totalSheetsCount: result.metrics.sheetsCount,
+          totalMaterialAreaMm2: BigInt(
+            result.sheets.reduce(
+              (sum, sheet) => sum + sheet.usableWidthMm * sheet.usableHeightMm,
+              0,
+            ),
+          ),
+          totalPartsAreaMm2: BigInt(result.metrics.partsAreaMm2),
+          totalWasteAreaMm2: BigInt(result.metrics.wasteAreaMm2),
+          usefulOffcutsAreaMm2: BigInt(
+            result.sheets.reduce(
+              (sum, sheet) =>
+                sum +
+                sheet.offcuts
+                  .filter((offcut) => offcut.isUseful)
+                  .reduce((offcutSum, offcut) => offcutSum + offcut.areaMm2, 0),
+              0,
+            ),
+          ),
+          wastePercent: result.metrics.wastePercent,
+          totalOperationsCount: result.metrics.operationsCount,
+          totalSetupChangesCount: result.metrics.setupChangesCount,
+          totalManualOperationsCount: result.metrics.manualOperationsCount,
+          settingsJson: JSON.parse(JSON.stringify(engineInput.settings)),
         },
       });
 
-      for (const placement of sheet.placements) {
-        await tx.placement.create({
+      for (const sheet of result.sheets) {
+        const createdSheet = await tx.cutPlanSheet.create({
           data: {
             id: generateEntityId(),
-            cutPlanSheetId: createdSheet.id,
-            partId: placement.partId,
-            partInstanceIndex: placement.partInstanceIndex,
-            xMm: placement.xMm,
-            yMm: placement.yMm,
-            widthMm: placement.widthMm,
-            heightMm: placement.heightMm,
-            rotationDeg: placement.rotationDeg,
-            label: placement.label,
-          },
-        });
-      }
-
-      for (const operation of sheet.operations) {
-        await tx.cutOperation.create({
-          data: {
-            id: generateEntityId(),
-            cutPlanSheetId: createdSheet.id,
-            sequenceNumber: operation.sequenceNumber,
-            operationType: operation.operationType,
-            axis: operation.axis,
-            x1Mm: operation.x1Mm,
-            y1Mm: operation.y1Mm,
-            x2Mm: operation.x2Mm,
-            y2Mm: operation.y2Mm,
-            positionMm: operation.positionMm,
-            targetPartId: operation.targetPartId,
-            kerfMm: engineInput.machine.kerfMm,
-            note: operation.note,
-            riskLevel: operation.riskLevel,
-          },
-        });
-      }
-
-      for (const offcut of sheet.offcuts) {
-        await tx.plannedOffcut.create({
-          data: {
-            id: generateEntityId(),
-            cutPlanSheetId: createdSheet.id,
+            cutPlanId: createdPlan.id,
+            sourceType: "full_sheet",
+            sourceSheetFormatId: sheetFormatId,
+            sheetIndex: sheet.sheetIndex,
+            widthMm: sheet.widthMm,
+            heightMm: sheet.heightMm,
+            usableXmm: sheet.usableXmm,
+            usableYmm: sheet.usableYmm,
+            usableWidthMm: sheet.usableWidthMm,
+            usableHeightMm: sheet.usableHeightMm,
             materialId,
-            xMm: offcut.xMm,
-            yMm: offcut.yMm,
-            widthMm: offcut.widthMm,
-            heightMm: offcut.heightMm,
-            areaMm2: BigInt(offcut.areaMm2),
-            isUseful: offcut.isUseful,
-            status: "planned",
           },
         });
+
+        if (sheet.placements.length > 0) {
+          await tx.placement.createMany({
+            data: sheet.placements.map((placement) => ({
+              id: generateEntityId(),
+              cutPlanSheetId: createdSheet.id,
+              partId: placement.partId,
+              partInstanceIndex: placement.partInstanceIndex,
+              xMm: placement.xMm,
+              yMm: placement.yMm,
+              widthMm: placement.widthMm,
+              heightMm: placement.heightMm,
+              rotationDeg: placement.rotationDeg,
+              label: placement.label,
+            })),
+          });
+        }
+
+        if (sheet.operations.length > 0) {
+          await tx.cutOperation.createMany({
+            data: sheet.operations.map((operation) => ({
+              id: generateEntityId(),
+              cutPlanSheetId: createdSheet.id,
+              sequenceNumber: operation.sequenceNumber,
+              operationType: operation.operationType,
+              axis: operation.axis,
+              x1Mm: operation.x1Mm,
+              y1Mm: operation.y1Mm,
+              x2Mm: operation.x2Mm,
+              y2Mm: operation.y2Mm,
+              positionMm: operation.positionMm,
+              targetPartId: operation.targetPartId,
+              kerfMm: engineInput.machine.kerfMm,
+              note: operation.note,
+              riskLevel: operation.riskLevel,
+            })),
+          });
+        }
+
+        if (sheet.offcuts.length > 0) {
+          await tx.plannedOffcut.createMany({
+            data: sheet.offcuts.map((offcut) => ({
+              id: generateEntityId(),
+              cutPlanSheetId: createdSheet.id,
+              materialId,
+              xMm: offcut.xMm,
+              yMm: offcut.yMm,
+              widthMm: offcut.widthMm,
+              heightMm: offcut.heightMm,
+              areaMm2: BigInt(offcut.areaMm2),
+              isUseful: offcut.isUseful,
+              status: "planned",
+            })),
+          });
+        }
       }
-    }
 
-    await tx.project.update({
-      where: { id: projectId },
-      data: { status: "calculated" },
-    });
+      await tx.project.update({
+        where: { id: projectId },
+        data: { status: "calculated" },
+      });
 
-    return createdPlan;
-  });
+      return createdPlan;
+    },
+    { timeout: 30_000 },
+  );
 
   return cutPlan.id;
 }

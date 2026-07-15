@@ -1,6 +1,6 @@
 import { attachMetrics } from "./metrics";
 import { toSheetResult } from "./operations";
-import { chooseAxis, packPartsSequentially } from "./packing";
+import { chooseAxis, packParts } from "./packing";
 import type { EngineInput, EngineResult } from "./types";
 import {
   expandPartInstances,
@@ -36,7 +36,8 @@ export function runCuttingEngine(input: EngineInput): EngineResult {
   const usable = getUsableArea(input.sheet);
   const instances = orderInstancesBySpec(expandPartInstances(input.parts));
   const axis = chooseAxis(instances, usable, input.machine);
-  const packedSheets = packPartsSequentially(instances, usable, input.machine.kerfMm, axis);
+  // packParts докладывает детали на открытые листы; sequential = 1 деталь/лист
+  const packedSheets = packParts(instances, usable, input.machine.kerfMm, axis);
   const sheets = packedSheets.map((packed) => toSheetResult(packed, input, usable));
 
   return attachMetrics({

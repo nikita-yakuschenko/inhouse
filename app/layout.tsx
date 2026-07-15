@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Inter } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,6 +34,7 @@ export default function RootLayout({
     <html lang="ru" className={`${inter.variable} ${ibmPlexSans.variable} h-full`}>
       <body className="min-h-full font-sans antialiased">
         <TooltipProvider>{children}</TooltipProvider>
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   );

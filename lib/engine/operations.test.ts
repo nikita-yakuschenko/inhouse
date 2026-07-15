@@ -81,10 +81,10 @@ describe("buildGuillotineCuts", () => {
       "П(Ц)-1 [01] - 2",
       "П(Ц)-1 [01] - 3",
     ]);
-    expect(result.sheets.map((sheet) => sheet.sheetIndex)).toEqual([1, 2, 3]);
+    expect(result.metrics.sheetsCount).toBe(1);
   });
 
-  it("раскладывает листы по порядку спецификации и экземпляров", () => {
+  it("раскладывает детали по порядку спецификации и экземпляров", () => {
     const result = runCuttingEngine({
       ...singlePartInput,
       parts: [
@@ -115,7 +115,9 @@ describe("buildGuillotineCuts", () => {
       ],
     });
 
-    const labels = result.sheets.map((sheet) => sheet.placements[0]?.label);
+    const labels = result.sheets.flatMap((sheet) =>
+      sheet.placements.map((placement) => placement.label),
+    );
 
     expect(labels).toEqual([
       "П(Ц)-1 [01] - 1",
@@ -162,5 +164,24 @@ describe("buildGuillotineCuts", () => {
     expect(cuts).toHaveLength(1);
     expect(cuts?.[0]?.axis).toBe("horizontal");
     expect(cuts?.[0]?.y1Mm).toBe(2010);
+  });
+
+  it("не добавляет подрезку кромок даже при ненулевом trim", () => {
+    const result = runCuttingEngine({
+      ...singlePartInput,
+      sheet: {
+        ...singlePartInput.sheet,
+        trimLeftMm: 5,
+        trimRightMm: 5,
+        trimTopMm: 5,
+        trimBottomMm: 5,
+      },
+    });
+
+    const trimCuts = result.sheets[0]?.operations.filter(
+      (operation) => operation.operationType === "trim_cut",
+    );
+
+    expect(trimCuts).toEqual([]);
   });
 });

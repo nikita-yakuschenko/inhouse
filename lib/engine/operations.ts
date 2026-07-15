@@ -8,62 +8,6 @@ import type {
   UsableArea,
 } from "./types";
 
-function buildTrimOperations(
-  input: EngineInput,
-  usable: UsableArea,
-  startSequence: number,
-): EngineOperation[] {
-  const ops: EngineOperation[] = [];
-  let seq = startSequence;
-  const { sheet } = input;
-
-  if (sheet.trimBottomMm > 0) {
-    ops.push({
-      sequenceNumber: seq++,
-      operationType: "trim_cut",
-      axis: "horizontal",
-      positionMm: usable.y,
-      note: "Подрезка нижнего края",
-      riskLevel: "normal",
-    });
-  }
-
-  if (sheet.trimTopMm > 0) {
-    ops.push({
-      sequenceNumber: seq++,
-      operationType: "trim_cut",
-      axis: "horizontal",
-      positionMm: sheet.heightMm - sheet.trimTopMm,
-      note: "Подрезка верхнего края",
-      riskLevel: "normal",
-    });
-  }
-
-  if (sheet.trimLeftMm > 0) {
-    ops.push({
-      sequenceNumber: seq++,
-      operationType: "trim_cut",
-      axis: "vertical",
-      positionMm: usable.x,
-      note: "Подрезка левого края",
-      riskLevel: "normal",
-    });
-  }
-
-  if (sheet.trimRightMm > 0) {
-    ops.push({
-      sequenceNumber: seq++,
-      operationType: "trim_cut",
-      axis: "vertical",
-      positionMm: sheet.widthMm - sheet.trimRightMm,
-      note: "Подрезка правого края",
-      riskLevel: "normal",
-    });
-  }
-
-  return ops;
-}
-
 function getWorkingStripHeight(packed: PackedSheet, usable: UsableArea): number {
   if (packed.strips.length === 0) {
     return usable.y;
@@ -183,15 +127,11 @@ export function buildSheetOperations(
   input: EngineInput,
   usable: UsableArea,
 ): EngineOperation[] {
-  const trimOps = buildTrimOperations(input, usable, 1);
-  const nextSeq = trimOps.length + 1;
-  const cutOps = buildGuillotineCuts(packed, input, usable, nextSeq);
-  const labelOps = buildLabelOperations(
-    packed.placements,
-    nextSeq + cutOps.length,
-  );
+  // Заводской лист — без подрезки кромок; trim_* только сужает usable area при необходимости
+  const cutOps = buildGuillotineCuts(packed, input, usable, 1);
+  const labelOps = buildLabelOperations(packed.placements, cutOps.length + 1);
 
-  return [...trimOps, ...cutOps, ...labelOps];
+  return [...cutOps, ...labelOps];
 }
 
 function rectanglesOverlap(
