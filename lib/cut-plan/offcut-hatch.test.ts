@@ -21,10 +21,10 @@ describe("clipSegmentToRect", () => {
   it("trims a diagonal segment to the rect bounds", () => {
     const clipped = clipSegmentToRect(80, 40, 320, 150, rect);
     expect(clipped).not.toBeNull();
-    expect(clipped!.x1Mm).toBeGreaterThanOrEqual(rect.xMm);
-    expect(clipped!.y1Mm).toBeGreaterThanOrEqual(rect.yMm);
-    expect(clipped!.x2Mm).toBeLessThanOrEqual(rect.xMm + rect.widthMm);
-    expect(clipped!.y2Mm).toBeLessThanOrEqual(rect.yMm + rect.heightMm);
+    expect(clipped!.x1Mm).toBeGreaterThanOrEqual(rect.xMm - 1e-6);
+    expect(clipped!.y1Mm).toBeGreaterThanOrEqual(rect.yMm - 1e-6);
+    expect(clipped!.x2Mm).toBeLessThanOrEqual(rect.xMm + rect.widthMm + 1e-6);
+    expect(clipped!.y2Mm).toBeLessThanOrEqual(rect.yMm + rect.heightMm + 1e-6);
   });
 
   it("drops a segment completely outside the rect", () => {
@@ -55,6 +55,37 @@ describe("clipOffcutHatchLines", () => {
 
   it("builds more raw hatch lines than clipped lines", () => {
     const rect = { xMm: 10, yMm: 10, widthMm: 120, heightMm: 60 };
-    expect(buildOffcutHatchLines(rect).length).toBeGreaterThan(clipOffcutHatchLines(rect).length);
+    expect(buildOffcutHatchLines(rect).length).toBeGreaterThan(
+      clipOffcutHatchLines(rect).length,
+    );
+  });
+
+  it("покрывает все углы широкого короткого отхода (без треугольной дыры)", () => {
+    const rect = { xMm: 0, yMm: 0, widthMm: 3000, heightMm: 246.5 };
+    const clipped = clipOffcutHatchLines(rect);
+
+    function minDist(x: number, y: number) {
+      let best = Infinity;
+      for (const line of clipped) {
+        const dx = line.x2Mm - line.x1Mm;
+        const dy = line.y2Mm - line.y1Mm;
+        const len2 = dx * dx + dy * dy || 1;
+        const t = Math.max(
+          0,
+          Math.min(1, ((x - line.x1Mm) * dx + (y - line.y1Mm) * dy) / len2),
+        );
+        best = Math.min(
+          best,
+          Math.hypot(line.x1Mm + t * dx - x, line.y1Mm + t * dy - y),
+        );
+      }
+      return best;
+    }
+
+    // Правый нижний угол раньше был дырой.
+    expect(minDist(2990, 240)).toBeLessThan(15);
+    expect(minDist(2990, 5)).toBeLessThan(15);
+    expect(minDist(10, 240)).toBeLessThan(15);
+    expect(minDist(10, 5)).toBeLessThan(15);
   });
 });

@@ -2,10 +2,15 @@ import type { MmRect } from "@/lib/cut-plan/operator-view";
 
 export const OFFCUT_HATCH_STEP_MM = 12;
 
+/**
+ * Диагонали: x+y=const (y вниз). Offset 0…width+height — иначе
+ * правый нижний угол прямоугольника без штрихов (треугольная дыра).
+ */
 export function buildOffcutHatchLines(rect: MmRect) {
   const lines: Array<{ x1Mm: number; y1Mm: number; x2Mm: number; y2Mm: number }> = [];
+  const maxOffset = rect.widthMm + rect.heightMm;
 
-  for (let offset = -rect.heightMm; offset <= rect.widthMm; offset += OFFCUT_HATCH_STEP_MM) {
+  for (let offset = 0; offset <= maxOffset; offset += OFFCUT_HATCH_STEP_MM) {
     lines.push({
       x1Mm: rect.xMm + offset,
       y1Mm: rect.yMm,
@@ -17,42 +22,7 @@ export function buildOffcutHatchLines(rect: MmRect) {
   return lines;
 }
 
-function pointInRect(x: number, y: number, rect: MmRect) {
-  return (
-    x >= rect.xMm &&
-    x <= rect.xMm + rect.widthMm &&
-    y >= rect.yMm &&
-    y <= rect.yMm + rect.heightMm
-  );
-}
-
-function segmentIntersection(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number,
-  x4: number,
-  y4: number,
-) {
-  const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-  if (Math.abs(denominator) < 1e-9) {
-    return null;
-  }
-
-  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
-  const u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denominator;
-  if (t < 0 || t > 1 || u < 0 || u > 1) {
-    return null;
-  }
-
-  return {
-    x: x1 + t * (x2 - x1),
-    y: y1 + t * (y2 - y1),
-  };
-}
-
+/** Liang–Barsky: clip отрезка к axis-aligned rect. */
 export function clipSegmentToRect(
   x1: number,
   y1: number,
@@ -64,51 +34,52 @@ export function clipSegmentToRect(
   const maxX = rect.xMm + rect.widthMm;
   const minY = rect.yMm;
   const maxY = rect.yMm + rect.heightMm;
-  const points: Array<{ x: number; y: number }> = [];
 
-  if (pointInRect(x1, y1, rect)) {
-    points.push({ x: x1, y: y1 });
-  }
-  if (pointInRect(x2, y2, rect)) {
-    points.push({ x: x2, y: y2 });
-  }
+  let t0 = 0;
+  let t1 = 1;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
 
-  const edges = [
-    [minX, minY, maxX, minY],
-    [maxX, minY, maxX, maxY],
-    [maxX, maxY, minX, maxY],
-    [minX, maxY, minX, minY],
-  ] as const;
-
-  for (const [x3, y3, x4, y4] of edges) {
-    const hit = segmentIntersection(x1, y1, x2, y2, x3, y3, x4, y4);
-    if (hit) {
-      points.push(hit);
+  const clip = (p: number, q: number) => {
+    if (Math.abs(p) < 1e-12) {
+      return q >= 0;
     }
-  }
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
 
-  if (points.length < 2) {
+  if (
+    !clip(-dx, x1 - minX) ||
+    !clip(dx, maxX - x1) ||
+    !clip(-dy, y1 - minY) ||
+    !clip(dy, maxY - y1)
+  ) {
     return null;
   }
 
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const sorted = [...points].sort((left, right) => {
-    const leftT =
-      Math.abs(dx) >= Math.abs(dy) ? (left.x - x1) / (dx || 1) : (left.y - y1) / (dy || 1);
-    const rightT =
-      Math.abs(dx) >= Math.abs(dy) ? (right.x - x1) / (dx || 1) : (right.y - y1) / (dy || 1);
-    return leftT - rightT;
-  });
+  if (t1 < t0) return null;
 
-  const first = sorted[0]!;
-  const last = sorted[sorted.length - 1]!;
+  const cx1 = x1 + t0 * dx;
+  const cy1 = y1 + t0 * dy;
+  const cx2 = x1 + t1 * dx;
+  const cy2 = y1 + t1 * dy;
+
+  if (Math.hypot(cx2 - cx1, cy2 - cy1) < 1e-6) {
+    return null;
+  }
 
   return {
-    x1Mm: first.x,
-    y1Mm: first.y,
-    x2Mm: last.x,
-    y2Mm: last.y,
+    x1Mm: cx1,
+    y1Mm: cy1,
+    x2Mm: cx2,
+    y2Mm: cy2,
   };
 }
 
