@@ -3,6 +3,7 @@ import { degrees, rgb } from "pdf-lib";
 
 import type { ClientCutOperation, ClientPlacement, ClientPlannedOffcut } from "@/features/projects/serialize-panels";
 import { getOperatorCutOperations } from "@/lib/cut-plan/operator-operations";
+import { buildCutAxisLines } from "@/lib/cut-plan/cut-axes";
 import {
   buildOffcutLabelLayout,
   buildPartLabelLayout,
@@ -359,7 +360,29 @@ export function drawCutMapSheet(
     );
   }
 
-  for (const operation of getOperatorCutOperations(sheet.operations)) {
+  const cutOperations = getOperatorCutOperations(sheet.operations);
+
+  for (const line of buildCutAxisLines(cutOperations, {
+    xMm: 0,
+    yMm: 0,
+    widthMm: sheet.widthMm,
+    heightMm: sheet.heightMm,
+  })) {
+    const p1 = enginePointToOperatorSvg(
+      { xMm: line.x1Mm, yMm: line.y1Mm },
+      sheet.heightMm,
+    );
+    const p2 = enginePointToOperatorSvg(
+      { xMm: line.x2Mm, yMm: line.y2Mm },
+      sheet.heightMm,
+    );
+    drawSvgLine(page, p1.xMm, p1.yMm, p2.xMm, p2.yMm, mapper, {
+      color: PDF_COLORS.cutAxis,
+      widthMm: 1.25,
+    });
+  }
+
+  for (const operation of cutOperations) {
     const p1 = enginePointToOperatorSvg(
       { xMm: operation.x1Mm ?? 0, yMm: operation.y1Mm ?? 0 },
       sheet.heightMm,

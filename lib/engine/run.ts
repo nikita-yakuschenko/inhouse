@@ -9,7 +9,7 @@ import {
   validateEngineInput,
 } from "./validation";
 
-const ALGORITHM_VERSION = "0.3.0";
+const ALGORITHM_VERSION = "0.3.1";
 
 function emptyFailed(errors: string[]): EngineResult {
   return {

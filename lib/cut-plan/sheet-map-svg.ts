@@ -4,6 +4,7 @@ import type {
   ClientPlannedOffcut,
 } from "@/features/projects/serialize-panels";
 import { getOperatorCutOperations } from "@/lib/cut-plan/operator-operations";
+import { buildCutAxisLines } from "@/lib/cut-plan/cut-axes";
 import { buildOffcutHatchSvg } from "@/lib/cut-plan/offcut-hatch-svg";
 import { SVG_FONT_FAMILY } from "@/lib/cut-plan/pdf-font";
 import {
@@ -30,6 +31,8 @@ const PART_FILL = "#fda4af";
 const PART_STROKE = "#e11d48";
 const PART_LABEL_FILL = "#881337";
 const OFFCUT_LABEL_FILL = "#334155";
+const CUT_AXIS_STROKE = "#94a3b8";
+const CUT_SEGMENT_STROKE = "#dc2626";
 
 export type SheetMapSvgInput = {
   mapId: string;
@@ -179,7 +182,29 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
     })
     .join("");
 
-  const cutLines =
+  const cutAxisLines =
+    input.showCutLines === false
+      ? ""
+      : buildCutAxisLines(cutOperations, {
+          xMm: 0,
+          yMm: 0,
+          widthMm: input.widthMm,
+          heightMm: input.heightMm,
+        })
+          .map((line) => {
+            const p1 = enginePointToOperatorSvg(
+              { xMm: line.x1Mm, yMm: line.y1Mm },
+              input.heightMm,
+            );
+            const p2 = enginePointToOperatorSvg(
+              { xMm: line.x2Mm, yMm: line.y2Mm },
+              input.heightMm,
+            );
+            return `<line x1="${p1.xMm}" y1="${p1.yMm}" x2="${p2.xMm}" y2="${p2.yMm}" stroke="${CUT_AXIS_STROKE}" stroke-width="1.25" />`;
+          })
+          .join("");
+
+  const cutSegmentLines =
     input.showCutLines === false
       ? ""
       : cutOperations
@@ -193,7 +218,7 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
               input.heightMm,
             );
 
-            return `<line x1="${p1.xMm}" y1="${p1.yMm}" x2="${p2.xMm}" y2="${p2.yMm}" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="16 10" />`;
+            return `<line x1="${p1.xMm}" y1="${p1.yMm}" x2="${p2.xMm}" y2="${p2.yMm}" stroke="${CUT_SEGMENT_STROKE}" stroke-width="2.5" stroke-dasharray="16 10" />`;
           })
           .join("");
 
@@ -216,6 +241,7 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
     }
     ${offcutShapes}
     ${placementShapes}
-    ${cutLines}
+    ${cutAxisLines}
+    ${cutSegmentLines}
   </svg>`;
 }

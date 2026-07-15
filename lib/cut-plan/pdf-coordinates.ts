@@ -23,6 +23,7 @@ export const PDF_COLORS = {
   offcutFill: { r: 0.95, g: 0.96, b: 0.98 },
   offcutStroke: { r: 0.39, g: 0.45, b: 0.51 },
   offcutLabel: { r: 0.2, g: 0.25, b: 0.33 },
+  cutAxis: { r: 0.58, g: 0.65, b: 0.71 },
   cutLine: { r: 0.86, g: 0.15, b: 0.15 },
   text: { r: 0.07, g: 0.09, b: 0.15 },
   mutedText: { r: 0.42, g: 0.45, b: 0.5 },

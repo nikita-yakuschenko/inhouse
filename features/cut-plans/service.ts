@@ -7,7 +7,7 @@ import { markingOnlySheetsCount } from "@/lib/parts/part-work-type";
 
 const EMPTY_CUT_RESULT: EngineResult = {
   status: "success",
-  algorithmVersion: "0.3.0",
+  algorithmVersion: "0.3.1",
   score: 0,
   metrics: {
     sheetsCount: 0,
@@ -54,21 +54,25 @@ async function saveCutPlanResult(params: {
           score: result.score,
           totalSheetsCount: result.metrics.sheetsCount,
           totalMaterialAreaMm2: BigInt(
-            result.sheets.reduce(
-              (sum, sheet) => sum + sheet.usableWidthMm * sheet.usableHeightMm,
-              0,
+            Math.round(
+              result.sheets.reduce(
+                (sum, sheet) => sum + sheet.usableWidthMm * sheet.usableHeightMm,
+                0,
+              ),
             ),
           ),
-          totalPartsAreaMm2: BigInt(result.metrics.partsAreaMm2),
-          totalWasteAreaMm2: BigInt(result.metrics.wasteAreaMm2),
+          totalPartsAreaMm2: BigInt(Math.round(result.metrics.partsAreaMm2)),
+          totalWasteAreaMm2: BigInt(Math.round(result.metrics.wasteAreaMm2)),
           usefulOffcutsAreaMm2: BigInt(
-            result.sheets.reduce(
-              (sum, sheet) =>
-                sum +
-                sheet.offcuts
-                  .filter((offcut) => offcut.isUseful)
-                  .reduce((offcutSum, offcut) => offcutSum + offcut.areaMm2, 0),
-              0,
+            Math.round(
+              result.sheets.reduce(
+                (sum, sheet) =>
+                  sum +
+                  sheet.offcuts
+                    .filter((offcut) => offcut.isUseful)
+                    .reduce((offcutSum, offcut) => offcutSum + offcut.areaMm2, 0),
+                0,
+              ),
             ),
           ),
           wastePercent: result.metrics.wastePercent,

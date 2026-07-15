@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { IconDownload } from "@tabler/icons-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   type CutPlanPdfMeta,
 } from "@/lib/cut-plan/cut-plan-pdf-shared";
 import type { ClientPanel } from "@/features/projects/serialize-panels";
+import { russianErrorMessage } from "@/lib/ui/notify";
 
 export function ExportCutPlanPdfButton({
   meta,
@@ -32,8 +34,11 @@ export function ExportCutPlanPdfButton({
           try {
             const { exportCutPlanPdf } = await import("@/lib/cut-plan/export-cut-plan-pdf");
             await exportCutPlanPdf(meta, sheets);
+            toast.success("PDF сохранён");
           } catch (error) {
-            alert(error instanceof Error ? error.message : "Не удалось сформировать PDF");
+            toast.error(
+              russianErrorMessage(error, "Не удалось сформировать PDF"),
+            );
           }
         });
       }}

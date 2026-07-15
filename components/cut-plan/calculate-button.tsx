@@ -1,8 +1,11 @@
 "use client";
 
 import { useTransition } from "react";
+import { toast } from "sonner";
+
 import { calculateProjectAction } from "@/features/cut-plans/actions";
 import { Button } from "@/components/ui/button";
+import { russianErrorMessage } from "@/lib/ui/notify";
 
 export function CalculateButton({ projectId }: { projectId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -15,8 +18,11 @@ export function CalculateButton({ projectId }: { projectId: string }) {
         startTransition(async () => {
           try {
             await calculateProjectAction(projectId);
+            toast.success("Раскрой рассчитан");
           } catch (error) {
-            alert(error instanceof Error ? error.message : "Ошибка расчёта");
+            toast.error(
+              russianErrorMessage(error, "Не удалось рассчитать раскрой"),
+            );
           }
         });
       }}

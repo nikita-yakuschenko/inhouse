@@ -1,4 +1,5 @@
 import { formatPartMarkingLabel } from "@/lib/parts/part-marking";
+import { computeFreeRects } from "./free-rects";
 import type {
   EngineMachine,
   PackedSheet,
@@ -179,59 +180,84 @@ function sameHeightRowPenalty(
   return dist;
 }
 
-/** В каждом ряду собрать детали одной высоты подряд слева направо. */
-function regroupSameYByHeight(sheet: PackedSheet, kerfMm: number): void {
-  for (const strip of sheet.strips) {
-    const byY = new Map<number, PlacedPart[]>();
-    for (const part of strip.parts) {
-      const key = Math.round(part.yMm * 100) / 100;
-      const list = byY.get(key) ?? [];
-      list.push(part);
-      byY.set(key, list);
-    }
+/** В каждом ряду (одинаковый y) собрать детали одной высоты подряд. */
+function regroupSameYByHeight(
+  sheet: PackedSheet,
+  usable: UsableArea,
+  kerfMm: number,
+): void {
+  // Группируем по placements, не по strips: после compact полосы часто разваливаются.
+  const byY = new Map<number, PlacedPart[]>();
+  for (const part of sheet.placements) {
+    const key = Math.round(part.yMm * 100) / 100;
+    const list = byY.get(key) ?? [];
+    list.push(part);
+    byY.set(key, list);
+  }
 
-    for (const row of byY.values()) {
-      if (row.length < 2) continue;
+  for (const row of byY.values()) {
+    if (row.length < 2) continue;
 
-      const previous = row.map((part) => ({ part, xMm: part.xMm }));
-      row.sort((a, b) => {
-        if (a.heightMm !== b.heightMm) return b.heightMm - a.heightMm;
-        if (a.widthMm !== b.widthMm) return b.widthMm - a.widthMm;
-        return (a.partCode ?? "").localeCompare(b.partCode ?? "", "ru", {
-          numeric: true,
-        });
+    const previous = row.map((part) => ({ part, xMm: part.xMm }));
+    row.sort((a, b) => {
+      if (a.heightMm !== b.heightMm) return b.heightMm - a.heightMm;
+      if (a.widthMm !== b.widthMm) return b.widthMm - a.widthMm;
+      return (a.partCode ?? "").localeCompare(b.partCode ?? "", "ru", {
+        numeric: true,
       });
+    });
 
-      const startX = Math.min(...previous.map((item) => item.xMm));
-      let x = startX;
-      for (const part of row) {
-        part.xMm = x;
-        x += part.widthMm + kerfMm;
-      }
+    const startX = Math.min(...previous.map((item) => item.xMm));
+    let x = startX;
+    for (const part of row) {
+      part.xMm = x;
+      x += part.widthMm + kerfMm;
+    }
+    const newRight = x - kerfMm;
 
-      const overflow = row.some(
-        (part) => part.xMm + part.widthMm > strip.xMm + strip.widthMm + 0.01,
-      );
-      const collision = row.some((part) =>
-        strip.parts.some(
-          (other) =>
-            other !== part &&
-            Math.abs(other.yMm - part.yMm) >= 0.5 &&
-            overlapsWithKerf(part, other, kerfMm),
-        ),
-      );
-      if (overflow || collision) {
-        for (const item of previous) {
-          item.part.xMm = item.xMm;
-        }
+    // Откат только если ряд не влезает в лист или пересекается с другим рядом.
+    // Не сравниваем с oldRight: исходный ряд мог быть без kerf между первыми деталями,
+    // а после группировки kerf между всеми делает ряд на 1 резок шире — это нормально.
+    const overflow = newRight > usable.x + usable.width + 0.01;
+    const collision = row.some((part) =>
+      sheet.placements.some(
+        (other) =>
+          other !== part &&
+          Math.abs(other.yMm - part.yMm) >= 0.5 &&
+          overlapsWithKerf(part, other, kerfMm),
+      ),
+    );
+    if (overflow || collision) {
+      for (const item of previous) {
+        item.part.xMm = item.xMm;
       }
     }
   }
 
+  // Пересобираем полосы из финальных координат.
+  sheet.strips = rebuildStripsFromPlacements(sheet.placements);
   sheet.placements.sort((a, b) => {
     if (a.yMm !== b.yMm) return a.yMm - b.yMm;
     return a.xMm - b.xMm;
   });
+}
+
+/** Вертикальные полосы по x — для согласованности после перестановки в ряду. */
+function rebuildStripsFromPlacements(placements: PlacedPart[]): Strip[] {
+  if (placements.length === 0) return [];
+
+  const minX = Math.min(...placements.map((part) => part.xMm));
+  const maxRight = Math.max(...placements.map((part) => part.xMm + part.widthMm));
+  const maxTop = Math.max(...placements.map((part) => part.yMm + part.heightMm));
+
+  return [
+    {
+      xMm: minX,
+      widthMm: maxRight - minX,
+      heightUsedMm: maxTop,
+      parts: [...placements],
+    },
+  ];
 }
 
 function placeInStripAt(
@@ -279,6 +305,107 @@ function createVerticalStrip(
   return placement;
 }
 
+function placeAtPosition(
+  sheet: PackedSheet,
+  part: PartInstance,
+  orientation: Orientation,
+  xMm: number,
+  yMm: number,
+  usable: UsableArea,
+): PlacedPart {
+  let strip =
+    sheet.strips.find(
+      (item) =>
+        item.xMm <= xMm + 0.01 &&
+        item.xMm + item.widthMm >= xMm + orientation.widthMm - 0.01,
+    ) ??
+    sheet.strips.find((item) => Math.abs(item.xMm - xMm) < 0.5);
+
+  if (!strip) {
+    strip = {
+      xMm,
+      widthMm: orientation.widthMm,
+      heightUsedMm: 0,
+      parts: [],
+    };
+    sheet.strips.push(strip);
+  }
+
+  const placement = placeInStripAt(strip, part, orientation, xMm, yMm, usable);
+  sheet.placements.push(placement);
+  return placement;
+}
+
+/**
+ * Укладка в свободный прямоугольник листа (деловые карманы справа/сверху),
+ * если полосная модель место не нашла.
+ */
+function tryPlaceInFreeRect(
+  sheet: PackedSheet,
+  part: PartInstance,
+  usable: UsableArea,
+  kerfMm: number,
+): PlacedPart | null {
+  if (sheet.placements.length === 0) return null;
+
+  const free = computeFreeRects(sheet.placements, usable, kerfMm).sort(
+    (a, b) => a.y - b.y || a.x - b.x || b.w * b.h - a.w * a.h,
+  );
+
+  let best: {
+    orientation: Orientation;
+    xMm: number;
+    yMm: number;
+    waste: number;
+  } | null = null;
+
+  for (const orientation of getOrientations(part)) {
+    for (const rect of free) {
+      if (orientation.widthMm > rect.w + 0.01) continue;
+      if (orientation.heightMm > rect.h + 0.01) continue;
+
+      const candidate = {
+        xMm: rect.x,
+        yMm: rect.y,
+        widthMm: orientation.widthMm,
+        heightMm: orientation.heightMm,
+      };
+      if (
+        sheet.placements.some((other) =>
+          overlapsWithKerf(candidate, other, kerfMm),
+        )
+      ) {
+        continue;
+      }
+
+      const waste =
+        rect.y * 1_000_000 +
+        rect.x * 1_000 +
+        (rect.w - orientation.widthMm) +
+        (rect.h - orientation.heightMm);
+
+      if (!best || waste < best.waste) {
+        best = {
+          orientation,
+          xMm: rect.x,
+          yMm: rect.y,
+          waste,
+        };
+      }
+    }
+  }
+
+  if (!best) return null;
+  return placeAtPosition(
+    sheet,
+    part,
+    best.orientation,
+    best.xMm,
+    best.yMm,
+    usable,
+  );
+}
+
 function tryPlaceVertical(
   sheet: PackedSheet,
   part: PartInstance,
@@ -323,6 +450,9 @@ function tryPlaceVertical(
     sheet.placements.push(placement);
     return placement;
   }
+
+  const pocket = tryPlaceInFreeRect(sheet, part, usable, kerfMm);
+  if (pocket) return pocket;
 
   for (const orientation of sortOrientationsForNewStrip(getOrientations(part))) {
     const placement = createVerticalStrip(sheet, part, orientation, usable, kerfMm);
@@ -384,7 +514,7 @@ function tryPlaceHorizontal(
     }
   }
 
-  return null;
+  return tryPlaceInFreeRect(sheet, part, usable, kerfMm);
 }
 
 function tryPlaceOnSheet(
@@ -436,6 +566,8 @@ export function packParts(
     const areaA = a.widthMm * a.heightMm;
     const areaB = b.widthMm * b.heightMm;
     if (areaA !== areaB) return areaB - areaA;
+    // Одинаковая «крупность» — сначала выравниваем по высоте, чтобы ряд не чередовался.
+    if (a.heightMm !== b.heightMm) return b.heightMm - a.heightMm;
     const maxA = Math.max(a.widthMm, a.heightMm);
     const maxB = Math.max(b.widthMm, b.heightMm);
     if (maxA !== maxB) return maxB - maxA;
@@ -466,9 +598,11 @@ export function packParts(
 
   if (axis === "vertical") {
     compactIntoGaps(sheets, usable, kerfMm);
-    for (const sheet of sheets) {
-      regroupSameYByHeight(sheet, kerfMm);
-    }
+  }
+
+  // Всегда: в ряду одной высоты — подряд (после compact полосы часто разбиты).
+  for (const sheet of sheets) {
+    regroupSameYByHeight(sheet, usable, kerfMm);
   }
 
   return sheets;

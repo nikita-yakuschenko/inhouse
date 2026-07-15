@@ -2,8 +2,11 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 import { calculateProjectAction } from "@/features/cut-plans/actions";
 import { Button } from "@/components/ui/button";
+import { russianErrorMessage } from "@/lib/ui/notify";
 
 export function CalculateProjectButton({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -17,9 +20,12 @@ export function CalculateProjectButton({ projectId }: { projectId: string }) {
         startTransition(async () => {
           try {
             await calculateProjectAction(projectId);
+            toast.success("Раскрой рассчитан");
             router.refresh();
           } catch (error) {
-            alert(error instanceof Error ? error.message : "Ошибка расчёта");
+            toast.error(
+              russianErrorMessage(error, "Не удалось рассчитать раскрой"),
+            );
           }
         });
       }}

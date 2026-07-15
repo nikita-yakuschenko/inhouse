@@ -2,8 +2,11 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 import { calculatePanelAction } from "@/features/cut-plans/actions";
 import { Button } from "@/components/ui/button";
+import { russianErrorMessage } from "@/lib/ui/notify";
 
 export function CalculatePanelButton({
   projectId,
@@ -23,9 +26,12 @@ export function CalculatePanelButton({
         startTransition(async () => {
           try {
             await calculatePanelAction(projectId, panelId);
+            toast.success("Раскрой панели рассчитан");
             router.refresh();
           } catch (error) {
-            alert(error instanceof Error ? error.message : "Ошибка расчёта");
+            toast.error(
+              russianErrorMessage(error, "Не удалось рассчитать раскрой"),
+            );
           }
         });
       }}

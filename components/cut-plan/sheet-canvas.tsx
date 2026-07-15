@@ -14,6 +14,7 @@ import {
   getOperatorSheetSize,
 } from "@/lib/cut-plan/operator-view";
 import { getOperatorCutOperations } from "@/lib/cut-plan/operator-operations";
+import { buildCutAxisLines } from "@/lib/cut-plan/cut-axes";
 import {
   buildOffcutLabelLayout,
   buildPartLabelLayout,
@@ -118,6 +119,8 @@ const PART_FILL = "#fda4af";
 const PART_STROKE = "#e11d48";
 const PART_LABEL_FILL = "#881337";
 const OFFCUT_LABEL_FILL = "#334155";
+const CUT_AXIS_STROKE = "#94a3b8";
+const CUT_SEGMENT_STROKE = "#dc2626";
 const PART_LABEL_FONT = 'var(--font-ibm-plex), "IBM Plex Sans", system-ui, sans-serif';
 
 function LabelBadgeRect({ badge, stroke }: { badge: LabelBadge; stroke: string }) {
@@ -606,6 +609,33 @@ export function SheetCanvas({
               );
             })}
 
+            {buildCutAxisLines(cutOperations, {
+              xMm: 0,
+              yMm: 0,
+              widthMm: props.widthMm,
+              heightMm: props.heightMm,
+            }).map((line, index) => {
+              const p1 = enginePointToOperatorSvg(
+                { xMm: line.x1Mm, yMm: line.y1Mm },
+                props.heightMm,
+              );
+              const p2 = enginePointToOperatorSvg(
+                { xMm: line.x2Mm, yMm: line.y2Mm },
+                props.heightMm,
+              );
+              return (
+                <line
+                  key={`cut-axis-${index}`}
+                  x1={p1.xMm}
+                  y1={p1.yMm}
+                  x2={p2.xMm}
+                  y2={p2.yMm}
+                  stroke={CUT_AXIS_STROKE}
+                  strokeWidth={1.25}
+                />
+              );
+            })}
+
             {cutOperations.map((operation) => {
                 const p1 = enginePointToOperatorSvg(
                   {
@@ -628,7 +658,7 @@ export function SheetCanvas({
                     y1={p1.yMm}
                     x2={p2.xMm}
                     y2={p2.yMm}
-                    stroke="#dc2626"
+                    stroke={CUT_SEGMENT_STROKE}
                     strokeWidth={2.5}
                     strokeDasharray="16 10"
                   />
