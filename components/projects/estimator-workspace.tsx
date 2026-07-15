@@ -208,6 +208,8 @@ function EstimatorWorkspaceInner({
               projectId={projectId}
               panelId={primaryPanel.id}
               parts={allParts}
+              sheetWidthMm={sheetContext?.sheetWidthMm}
+              sheetHeightMm={sheetContext?.sheetHeightMm}
             />
           </TabsContent>
 

@@ -12,17 +12,106 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { partitionPartsByWorkType } from "@/lib/parts/part-work-type";
 import { IconTrash } from "@tabler/icons-react";
+
+function PartsTable({
+  projectId,
+  parts,
+}: {
+  projectId: string;
+  parts: ClientPart[];
+}) {
+  if (parts.length === 0) {
+    return (
+      <p className="px-6 py-8 text-center text-sm text-muted-foreground">Нет деталей</p>
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="pl-6">Марка</TableHead>
+          <TableHead>Код</TableHead>
+          <TableHead className="text-right">Ширина, мм</TableHead>
+          <TableHead className="text-right">Высота, мм</TableHead>
+          <TableHead className="text-right">Кол-во</TableHead>
+          <TableHead className="pr-6 text-right"> </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {parts.map((part) => (
+          <TableRow key={part.id}>
+            <TableCell className="pl-6 font-medium">{part.name}</TableCell>
+            <TableCell className="text-muted-foreground">{part.code ?? "—"}</TableCell>
+            <TableCell className="text-right tabular-nums">{part.widthMm}</TableCell>
+            <TableCell className="text-right tabular-nums">{part.heightMm}</TableCell>
+            <TableCell className="text-right tabular-nums">{part.quantity}</TableCell>
+            <TableCell className="pr-6 text-right">
+              <form action={deletePartAction}>
+                <input type="hidden" name="projectId" value={projectId} />
+                <input type="hidden" name="partId" value={part.id} />
+                <button
+                  type="submit"
+                  className="inline-flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  aria-label={`Удалить «${part.name}»`}
+                  title="Удалить"
+                >
+                  <IconTrash className="size-4" stroke={1.75} />
+                </button>
+              </form>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function PartsGroup({
+  title,
+  description,
+  projectId,
+  parts,
+}: {
+  title: string;
+  description: string;
+  projectId: string;
+  parts: ClientPart[];
+}) {
+  if (parts.length === 0) return null;
+
+  return (
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="border-b px-6 py-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <PartsTable projectId={projectId} parts={parts} />
+    </div>
+  );
+}
 
 export function EstimatorPartsSection({
   projectId,
   panelId,
   parts,
+  sheetWidthMm,
+  sheetHeightMm,
 }: {
   projectId: string;
   panelId: string;
   parts: ClientPart[];
+  sheetWidthMm?: number | null;
+  sheetHeightMm?: number | null;
 }) {
+  const { cuttingAndMarking, markingOnly } = partitionPartsByWorkType(
+    parts,
+    sheetWidthMm,
+    sheetHeightMm,
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <form
@@ -58,51 +147,28 @@ export function EstimatorPartsSection({
         </div>
       </form>
 
-      <div className="overflow-hidden rounded-xl border bg-card">
-        {parts.length === 0 ? (
+      {parts.length === 0 ? (
+        <div className="overflow-hidden rounded-xl border bg-card">
           <p className="px-6 py-10 text-center text-sm text-muted-foreground">
             Добавьте детали для расчёта раскроя
           </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">Марка</TableHead>
-                <TableHead>Код</TableHead>
-                <TableHead className="text-right">Ширина, мм</TableHead>
-                <TableHead className="text-right">Высота, мм</TableHead>
-                <TableHead className="text-right">Кол-во</TableHead>
-                <TableHead className="pr-6 text-right"> </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {parts.map((part) => (
-                <TableRow key={part.id}>
-                  <TableCell className="pl-6 font-medium">{part.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{part.code ?? "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{part.widthMm}</TableCell>
-                  <TableCell className="text-right tabular-nums">{part.heightMm}</TableCell>
-                  <TableCell className="text-right tabular-nums">{part.quantity}</TableCell>
-                  <TableCell className="pr-6 text-right">
-                    <form action={deletePartAction}>
-                      <input type="hidden" name="projectId" value={projectId} />
-                      <input type="hidden" name="partId" value={part.id} />
-                      <button
-                        type="submit"
-                        className="inline-flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                        aria-label={`Удалить «${part.name}»`}
-                        title="Удалить"
-                      >
-                        <IconTrash className="size-4" stroke={1.75} />
-                      </button>
-                    </form>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <PartsGroup
+            title="Раскрой и маркировка"
+            description="Детали меньше листа — участвуют в раскрое"
+            projectId={projectId}
+            parts={cuttingAndMarking}
+          />
+          <PartsGroup
+            title="Только маркировка"
+            description="Размер совпадает с листом — резка не нужна"
+            projectId={projectId}
+            parts={markingOnly}
+          />
+        </div>
+      )}
     </div>
   );
 }

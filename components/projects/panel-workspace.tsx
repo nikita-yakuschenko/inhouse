@@ -175,6 +175,8 @@ function PanelWorkspaceInner({
               parts={allParts}
               activePartId={activePartId}
               onPartSelect={handlePartSelect}
+              sheetWidthMm={sheetContext?.sheetWidthMm}
+              sheetHeightMm={sheetContext?.sheetHeightMm}
             />
           </div>
         </aside>
