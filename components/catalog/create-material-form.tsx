@@ -46,8 +46,9 @@ export function CreateMaterialForm() {
           name="thicknessMm"
           type="number"
           required
-          min={1}
-          placeholder="13"
+          min={0.1}
+          step={0.1}
+          placeholder="12.5"
           disabled={pending}
         />
       </div>

@@ -7,9 +7,18 @@ import prisma from "@/lib/db/prisma";
 import { generateEntityId } from "@/lib/id";
 import { SEED_IDS } from "@/lib/seed-ids";
 
+/** Парсит мм с запятой или точкой: «12,5» → 12.5 */
+function parseMmNumber(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return value;
+  return value.trim().replace(",", ".");
+}
+
 const sheetMaterialSchema = z.object({
   name: z.string().trim().min(1, "Укажите название материала"),
-  thicknessMm: z.coerce.number().int().positive("Толщина должна быть больше 0"),
+  thicknessMm: z.coerce
+    .number()
+    .positive("Толщина должна быть больше 0")
+    .max(500, "Толщина слишком большая"),
   widthMm: z.coerce.number().int().positive("Ширина листа должна быть больше 0"),
   heightMm: z.coerce.number().int().positive("Высота листа должна быть больше 0"),
   materialType: z.string().trim().min(1).default("sheet"),
@@ -19,7 +28,7 @@ const sheetMaterialSchema = z.object({
 export async function createMaterialAction(formData: FormData) {
   const parsed = sheetMaterialSchema.safeParse({
     name: formData.get("name"),
-    thicknessMm: formData.get("thicknessMm"),
+    thicknessMm: parseMmNumber(formData.get("thicknessMm")),
     widthMm: formData.get("widthMm"),
     heightMm: formData.get("heightMm"),
     materialType: formData.get("materialType") || "sheet",

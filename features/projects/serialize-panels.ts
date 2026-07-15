@@ -84,14 +84,19 @@ export type ClientSheetContext = {
 };
 
 type ProjectWithSheetContext = {
-  material: { name: string; thicknessMm: number } | null;
+  material: { name: string; thicknessMm: number | { toNumber(): number } } | null;
   sheetFormat: {
     name: string;
     widthMm: number;
     heightMm: number;
-    thicknessMm: number;
+    thicknessMm: number | { toNumber(): number };
   } | null;
 };
+
+function toMmNumber(value: number | { toNumber(): number } | null | undefined): number | null {
+  if (value == null) return null;
+  return typeof value === "number" ? value : value.toNumber();
+}
 
 function withMmSuffix(name: string): string {
   const trimmed = name.trim();
@@ -108,7 +113,8 @@ export function serializeSheetContext(
     return null;
   }
 
-  const thicknessMm = sheetFormat?.thicknessMm ?? material?.thicknessMm ?? null;
+  const thicknessMm =
+    toMmNumber(sheetFormat?.thicknessMm) ?? toMmNumber(material?.thicknessMm);
   const label = sheetFormat
     ? withMmSuffix(sheetFormat.name)
     : withMmSuffix(material!.name);

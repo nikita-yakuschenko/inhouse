@@ -72,7 +72,7 @@ export default async function MaterialsCatalogPage() {
                       {sheet.heightMm}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {sheet.thicknessMm}
+                      {Number(sheet.thicknessMm)}
                     </TableCell>
                     <TableCell className="pr-6 text-right">
                       <DeleteMaterialButton

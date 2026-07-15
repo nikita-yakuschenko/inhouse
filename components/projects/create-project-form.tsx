@@ -99,7 +99,7 @@ export function CreateProjectForm({
           >
             {sheetFormats.map((sheet) => (
               <option key={sheet.id} value={sheet.id}>
-                {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×{sheet.thicknessMm}
+                {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×{Number(sheet.thicknessMm)}
               </option>
             ))}
           </select>

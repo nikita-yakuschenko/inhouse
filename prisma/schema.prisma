@@ -101,7 +101,7 @@ model Material {
   organizationId      String   @map("organization_id")
   name                String
   materialType        String   @map("material_type")
-  thicknessMm         Int      @map("thickness_mm")
+  thicknessMm         Decimal  @db.Decimal(8, 2) @map("thickness_mm")
   densityKgM2         Decimal? @map("density_kg_m2")
   pricePerM2          Decimal? @map("price_per_m2")
   hasGrainDirection   Boolean  @default(false) @map("has_grain_direction")
@@ -128,7 +128,7 @@ model SheetFormat {
   name           String
   widthMm        Int      @map("width_mm")
   heightMm       Int      @map("height_mm")
-  thicknessMm    Int      @map("thickness_mm")
+  thicknessMm    Decimal  @db.Decimal(8, 2) @map("thickness_mm")
   pricePerSheet  Decimal? @map("price_per_sheet")
   trimLeftMm     Int      @default(0) @map("trim_left_mm")
   trimRightMm    Int      @default(0) @map("trim_right_mm")
