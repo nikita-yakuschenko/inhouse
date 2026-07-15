@@ -5,11 +5,11 @@ import type { EngineInput, EngineResult, PackedSheet } from "./types";
 import {
   expandPartInstances,
   getUsableArea,
-  orderInstancesBySpec,
+  orderInstancesForPacking,
   validateEngineInput,
 } from "./validation";
 
-const ALGORITHM_VERSION = "0.2.0";
+const ALGORITHM_VERSION = "0.3.0";
 
 function emptyFailed(errors: string[]): EngineResult {
   return {
@@ -77,7 +77,7 @@ export function runCuttingEngine(input: EngineInput): EngineResult {
   }
 
   const usable = getUsableArea(input.sheet);
-  const instances = orderInstancesBySpec(expandPartInstances(input.parts));
+  const instances = orderInstancesForPacking(expandPartInstances(input.parts));
   const { packed } = resolveAxis(input, instances, usable);
   const sheets = packed.map((sheet) => toSheetResult(sheet, input, usable));
 

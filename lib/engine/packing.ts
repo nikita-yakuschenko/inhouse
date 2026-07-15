@@ -1,3 +1,4 @@
+import { formatPartMarkingLabel } from "@/lib/parts/part-marking";
 import type {
   EngineMachine,
   PackedSheet,
@@ -6,7 +7,6 @@ import type {
   Strip,
   UsableArea,
 } from "./types";
-import { formatPartLabel } from "./validation";
 
 export type AxisMode = "vertical" | "horizontal";
 
@@ -58,7 +58,11 @@ function createPlacement(
     widthMm: orientation.widthMm,
     heightMm: orientation.heightMm,
     rotationDeg: orientation.rotationDeg,
-    label: formatPartLabel(part.partName, part.instanceIndex),
+    label: formatPartMarkingLabel(
+      part.partCode?.trim() || part.partName,
+      part.instanceIndex,
+      part.instanceCount,
+    ),
   };
 }
 
@@ -330,8 +334,18 @@ export function packParts(
   axis: AxisMode,
 ): PackedSheet[] {
   const sheets: PackedSheet[] = [];
+  // Сначала крупные — мелкие потом добивают пустоты на уже открытых листах.
+  const ordered = [...instances].sort((a, b) => {
+    const areaA = a.widthMm * a.heightMm;
+    const areaB = b.widthMm * b.heightMm;
+    if (areaA !== areaB) return areaB - areaA;
+    const maxA = Math.max(a.widthMm, a.heightMm);
+    const maxB = Math.max(b.widthMm, b.heightMm);
+    if (maxA !== maxB) return maxB - maxA;
+    return (a.partCode ?? "").localeCompare(b.partCode ?? "", "ru", { numeric: true });
+  });
 
-  for (const part of instances) {
+  for (const part of ordered) {
     let placed: PlacedPart | null = null;
 
     for (const sheet of sheets) {
@@ -353,7 +367,134 @@ export function packParts(
     }
   }
 
+  if (axis === "vertical") {
+    compactIntoGaps(sheets, usable, kerfMm);
+  }
+
   return sheets;
+}
+
+function removePlacementFromSheet(sheet: PackedSheet, placement: PlacedPart): PartInstance {
+  sheet.placements = sheet.placements.filter((item) => item !== placement);
+  for (const strip of sheet.strips) {
+    strip.parts = strip.parts.filter((item) => item !== placement);
+    if (strip.parts.length === 0) {
+      strip.heightUsedMm = 0;
+      strip.widthMm = 0;
+    } else {
+      strip.widthMm = strip.parts.reduce(
+        (max, part) => Math.max(max, part.xMm + part.widthMm - strip.xMm),
+        0,
+      );
+      strip.heightUsedMm = strip.parts.reduce(
+        (max, part) => Math.max(max, part.yMm + part.heightMm),
+        0,
+      );
+    }
+  }
+  sheet.strips = sheet.strips.filter((strip) => strip.parts.length > 0);
+
+  // Вернуть исходные габариты до поворота раскладки.
+  const widthMm =
+    placement.rotationDeg === 90 ? placement.heightMm : placement.widthMm;
+  const heightMm =
+    placement.rotationDeg === 90 ? placement.widthMm : placement.heightMm;
+
+  return {
+    partId: placement.partId,
+    partName: placement.partName,
+    partCode: placement.partCode,
+    specOrder: placement.specOrder,
+    instanceIndex: placement.instanceIndex,
+    instanceCount: placement.instanceCount,
+    widthMm,
+    heightMm,
+    allowRotation: placement.allowRotation,
+    priority: placement.priority,
+  };
+}
+
+/**
+ * Перекладывает мелкие детали с «дырявых» листов в свободные слоты более заполненных.
+ * Повторяет, пока есть переносы — меньше листов и пустот.
+ */
+function compactIntoGaps(
+  sheets: PackedSheet[],
+  usable: UsableArea,
+  kerfMm: number,
+): void {
+  let changed = true;
+  let guard = 0;
+
+  while (changed && guard < 200) {
+    changed = false;
+    guard += 1;
+
+    // Сначала пытаемся забрать детали с самых пустых листов.
+    const sources = [...sheets].sort(
+      (a, b) => a.placements.length - b.placements.length,
+    );
+
+    for (const source of sources) {
+      if (source.placements.length === 0) continue;
+
+      const candidates = [...source.placements].sort(
+        (a, b) => a.widthMm * a.heightMm - b.widthMm * b.heightMm,
+      );
+
+      for (const placement of candidates) {
+        const targets = sheets.filter((sheet) => sheet !== source);
+        if (targets.length === 0) continue;
+
+        const instance = removePlacementFromSheet(source, placement);
+        let moved = false;
+
+        for (const target of targets) {
+          const placed = tryPlaceOnSheet(target, instance, usable, kerfMm, "vertical");
+          if (placed) {
+            moved = true;
+            changed = true;
+            break;
+          }
+        }
+
+        if (!moved) {
+          // Вернуть на исходный лист как было.
+          const restored = tryPlaceOnSheet(source, instance, usable, kerfMm, "vertical");
+          if (!restored) {
+            // Аварийно: положить обратно вручную в конец новых координат нельзя — не должны терять.
+            source.placements.push(placement);
+            let strip = source.strips.find((item) => item.xMm === placement.xMm);
+            if (!strip) {
+              strip = {
+                xMm: placement.xMm,
+                widthMm: placement.widthMm,
+                heightUsedMm: placement.yMm + placement.heightMm,
+                parts: [],
+              };
+              source.strips.push(strip);
+            }
+            strip.parts.push(placement);
+            strip.widthMm = Math.max(strip.widthMm, placement.widthMm);
+            strip.heightUsedMm = Math.max(
+              strip.heightUsedMm,
+              placement.yMm + placement.heightMm,
+            );
+          }
+        } else {
+          break;
+        }
+      }
+      if (changed) break;
+    }
+
+    for (let i = sheets.length - 1; i >= 0; i -= 1) {
+      if (sheets[i].placements.length === 0) sheets.splice(i, 1);
+    }
+    sheets.forEach((sheet, index) => {
+      sheet.sheetIndex = index + 1;
+    });
+  }
 }
 
 export function chooseAxis(

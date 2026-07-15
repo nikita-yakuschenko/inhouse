@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 
+import { extractPanelCode } from "@/lib/parts/part-marking";
+
 export type ParsedSpecificationPart = {
   name: string;
   code: string;
@@ -7,6 +9,8 @@ export type ParsedSpecificationPart = {
   heightMm: number;
   quantity: number;
 };
+
+export { extractPanelCode } from "@/lib/parts/part-marking";
 
 function normalizeHeader(value: unknown): string {
   return String(value ?? "")
@@ -21,9 +25,38 @@ function findHeaderRowIndex(rows: unknown[][]): number {
     return (
       normalized.some((cell) => cell.includes("ширина")) &&
       normalized.some((cell) => cell.includes("длина") || cell.includes("высота")) &&
-      normalized.some((cell) => cell.includes("кол"))
+      normalized.some((cell) => cell.includes("кол")) &&
+      normalized.some((cell) => cell.includes("панель") || cell.includes("маркир"))
     );
   });
+}
+
+type ColumnIndexes = {
+  marking: number;
+  width: number;
+  height: number;
+  quantity: number;
+  panel: number;
+};
+
+function findColumnIndexes(headerRow: unknown[]): ColumnIndexes {
+  const normalized = headerRow.map(normalizeHeader);
+
+  const marking = normalized.findIndex((cell) => cell.includes("маркир"));
+  const width = normalized.findIndex((cell) => cell.includes("ширина"));
+  const height = normalized.findIndex(
+    (cell) => cell.includes("длина") || cell.includes("высота"),
+  );
+  const quantity = normalized.findIndex((cell) => cell.includes("кол"));
+  const panel = normalized.findIndex((cell) => cell.includes("панель"));
+
+  if (marking < 0 || width < 0 || height < 0 || quantity < 0 || panel < 0) {
+    throw new Error(
+      "Нужны колонки: Маркировка, Ширина, Длина, Кол-во, Панель",
+    );
+  }
+
+  return { marking, width, height, quantity, panel };
 }
 
 function parsePositiveInt(value: unknown): number | null {
@@ -36,23 +69,22 @@ function parsePositiveInt(value: unknown): number | null {
 function parseMarking(value: unknown): string | null {
   const text = String(value ?? "").trim();
   if (!text) return null;
-  return text.padStart(2, "0");
+  if (/^\d+$/.test(text)) return text.padStart(2, "0");
+  return text;
 }
 
-function buildPartName(prefix: string, code: string): string {
-  const trimmedPrefix = prefix.trim();
-  if (!trimmedPrefix) return `[${code}]`;
-  return `${trimmedPrefix} [${code}]`;
-}
-
-function extractSheetPrefix(sheetName: string): string {
-  const beforeDash = sheetName.split(" - ")[0]?.trim();
-  return beforeDash || sheetName.trim();
+function buildPartCode(panelName: string, marking: string): string {
+  const panelCode = extractPanelCode(panelName);
+  if (!panelCode) {
+    throw new Error(
+      `В названии панели нет кода вида «Ст-…»: «${panelName}»`,
+    );
+  }
+  return `${panelCode}-${marking}`;
 }
 
 export function parseSpecificationXlsx(
   buffer: ArrayBuffer | Buffer,
-  options?: { namePrefix?: string },
 ): ParsedSpecificationPart[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
@@ -65,24 +97,27 @@ export function parseSpecificationXlsx(
 
   const headerRowIndex = findHeaderRowIndex(rows);
   if (headerRowIndex < 0) {
-    throw new Error("Не найдена строка заголовков (Ширина / Длина / Кол-во)");
+    throw new Error(
+      "Не найдена строка заголовков (Маркировка / Ширина / Длина / Кол-во / Панель)",
+    );
   }
 
-  const prefix = options?.namePrefix ?? extractSheetPrefix(sheetName);
+  const columns = findColumnIndexes(rows[headerRowIndex] ?? []);
   const parts: ParsedSpecificationPart[] = [];
 
   for (let index = headerRowIndex + 1; index < rows.length; index += 1) {
     const row = rows[index] ?? [];
-    const marking = parseMarking(row[1]);
-    const widthMm = parsePositiveInt(row[2]);
-    const heightMm = parsePositiveInt(row[3]);
-    const quantity = parsePositiveInt(row[5]);
+    const marking = parseMarking(row[columns.marking]);
+    const widthMm = parsePositiveInt(row[columns.width]);
+    const heightMm = parsePositiveInt(row[columns.height]);
+    const quantity = parsePositiveInt(row[columns.quantity]);
+    const panelName = String(row[columns.panel] ?? "").trim();
 
-    if (!marking || !widthMm || !heightMm || !quantity) continue;
+    if (!marking || !widthMm || !heightMm || !quantity || !panelName) continue;
 
     parts.push({
-      code: marking,
-      name: buildPartName(prefix, marking),
+      code: buildPartCode(panelName, marking),
+      name: panelName,
       widthMm,
       heightMm,
       quantity,

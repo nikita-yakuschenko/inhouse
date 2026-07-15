@@ -1,4 +1,8 @@
 import type { EngineInput, EnginePart, PartInstance, UsableArea } from "./types";
+import {
+  formatPartMarkingLabel,
+  resolvePartMarking,
+} from "@/lib/parts/part-marking";
 
 export function getUsableArea(sheet: EngineInput["sheet"]): UsableArea {
   return {
@@ -9,14 +13,20 @@ export function getUsableArea(sheet: EngineInput["sheet"]): UsableArea {
   };
 }
 
-export function formatPartLabel(partName: string, instanceIndex: number): string {
-  return `${partName} - ${instanceIndex}`;
+/** @deprecated use formatPartMarkingLabel — оставлено для совместимости импортов. */
+export function formatPartLabel(
+  marking: string,
+  instanceIndex: number,
+  instanceCount = 1,
+): string {
+  return formatPartMarkingLabel(marking, instanceIndex, instanceCount);
 }
 
-/** Нормализует маркировку для отображения (в т.ч. старые записи без « - N»). */
+/** Показ маркировки: как сохранено при раскрое. */
 export function resolvePlacementMarking(label: string, instanceIndex: number): string {
-  const baseName = label.replace(/ - \d+$/, "");
-  return formatPartLabel(baseName, instanceIndex);
+  const trimmed = label.trim();
+  if (trimmed) return trimmed;
+  return String(instanceIndex);
 }
 
 export function expandPartInstances(parts: EnginePart[]): PartInstance[] {
@@ -24,10 +34,11 @@ export function expandPartInstances(parts: EnginePart[]): PartInstance[] {
 
   parts.forEach((part, specOrder) => {
     for (let i = 0; i < part.quantity; i += 1) {
+      const marking = resolvePartMarking(part.name, part.code);
       instances.push({
         partId: part.id,
         partName: part.name,
-        partCode: part.code,
+        partCode: marking,
         specOrder,
         instanceIndex: i + 1,
         instanceCount: part.quantity,
@@ -42,12 +53,27 @@ export function expandPartInstances(parts: EnginePart[]): PartInstance[] {
   return instances;
 }
 
-/** Порядок выполнения: код в спецификации, затем номер экземпляра. */
+/** Порядок кодов в спецификации (для отображения/сортировок списка). */
 export function orderInstancesBySpec(instances: PartInstance[]): PartInstance[] {
   return [...instances].sort((a, b) => {
     const codeCompare = comparePartCodes(a.partCode, b.partCode);
     if (codeCompare !== 0) return codeCompare;
     if (a.specOrder !== b.specOrder) return a.specOrder - b.specOrder;
+    return a.instanceIndex - b.instanceIndex;
+  });
+}
+
+/** Для раскладки: сначала крупные, потом плотнее заполняем дыры. */
+export function orderInstancesForPacking(instances: PartInstance[]): PartInstance[] {
+  return [...instances].sort((a, b) => {
+    const areaA = a.widthMm * a.heightMm;
+    const areaB = b.widthMm * b.heightMm;
+    if (areaA !== areaB) return areaB - areaA;
+    const maxA = Math.max(a.widthMm, a.heightMm);
+    const maxB = Math.max(b.widthMm, b.heightMm);
+    if (maxA !== maxB) return maxB - maxA;
+    const codeCompare = comparePartCodes(a.partCode, b.partCode);
+    if (codeCompare !== 0) return codeCompare;
     return a.instanceIndex - b.instanceIndex;
   });
 }

@@ -91,9 +91,7 @@ export async function importPartsFromXlsxAction(formData: FormData) {
     });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const importedParts = parseSpecificationXlsx(buffer, {
-      namePrefix: project.name,
-    });
+    const importedParts = parseSpecificationXlsx(buffer);
 
     const ids = generateEntityIds(importedParts.length);
 

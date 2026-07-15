@@ -52,7 +52,7 @@ describe("buildGuillotineCuts", () => {
     const placement = result.sheets[0]?.placements[0];
     expect(placement?.xMm).toBe(0);
     expect(placement?.yMm).toBe(0);
-    expect(placement?.label).toBe("Панель - 1");
+    expect(placement?.label).toBe("Панель");
   });
 
   it("нумерует одинаковые детали в маркировке", () => {
@@ -85,6 +85,36 @@ describe("buildGuillotineCuts", () => {
     expect(result.metrics.sheetsCount).toBe(1);
   });
 
+  it("на карте пишет код детали, а не длинное имя", () => {
+    const result = runCuttingEngine({
+      ...singlePartInput,
+      sheet: {
+        widthMm: 3000,
+        heightMm: 1250,
+        trimLeftMm: 0,
+        trimRightMm: 0,
+        trimTopMm: 0,
+        trimBottomMm: 0,
+      },
+      parts: [
+        {
+          id: "p1",
+          name: "Плитная обшивка внешняя Ст-1-01",
+          code: "02",
+          quantity: 1,
+          widthMm: 1000,
+          heightMm: 2900,
+          shapeType: "rectangle",
+          allowRotation: true,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+      ],
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.sheets[0]?.placements[0]?.label).toBe("Ст-1-01-02");
+  });
   it("раскладывает детали по порядку спецификации и экземпляров", () => {
     const result = runCuttingEngine({
       ...singlePartInput,
@@ -121,9 +151,9 @@ describe("buildGuillotineCuts", () => {
     );
 
     expect(labels).toEqual([
-      "П(Ц)-1 [01] - 1",
-      "П(Ц)-1 [01] - 2",
-      "П(Ц)-1 [02] - 1",
+      "01 - 1",
+      "01 - 2",
+      "02",
     ]);
   });
 

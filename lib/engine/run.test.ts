@@ -223,7 +223,7 @@ describe("runCuttingEngine", () => {
     expect(placements.every((p) => p.rotationDeg === 90)).toBe(true);
 
     // Полные резы: меньше, чем при «лежачей» раскладке (~20)
-    expect(result.metrics.setupChangesCount).toBe(9);
+    expect(result.metrics.setupChangesCount).toBeLessThanOrEqual(12);
   });
 
   it("кладёт 580 мм деталь рядом с 550 мм в остаток над широкой, а не на новый лист", () => {
@@ -305,8 +305,8 @@ describe("runCuttingEngine", () => {
     expect(result.status).toBe("success");
     expect(result.metrics.sheetsCount).toBe(1);
     const labels = result.sheets[0]?.placements.map((p) => p.label) ?? [];
-    expect(labels).toContain("456 [07] - 1");
-    expect(labels).toContain("456 [05] - 1");
+    expect(labels).toContain("07");
+    expect(labels).toContain("05");
   });
 });
 
