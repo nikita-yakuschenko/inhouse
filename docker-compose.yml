@@ -22,7 +22,7 @@ services:
     container_name: cutting-app
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "3300:3000"
     environment:
       DATABASE_URL: postgresql://cutting:cutting@postgres:5432/cutting
     depends_on:
