@@ -1,17 +1,26 @@
 import type { PDFPage } from "pdf-lib";
+import { rgb } from "pdf-lib";
 
-import type { CutPlanPdfMeta, CutPlanPdfSheet } from "@/lib/cut-plan/cut-plan-pdf-shared";
+import type {
+  CutPlanPdfMeta,
+  CutPlanPdfPage,
+} from "@/lib/cut-plan/cut-plan-pdf-shared";
 import { projectPdfTitle } from "@/lib/cut-plan/cut-plan-pdf-shared";
 import type { MaterialsSpecSummary } from "@/lib/cut-plan/materials-spec";
+import {
+  buildPdfPageLegendLines,
+  pdfWorkKindStampLabel,
+  type PdfWorkKind,
+} from "@/lib/cut-plan/pdf-page-legend";
 import { mmToPt, PDF_COLORS } from "@/lib/cut-plan/pdf-coordinates";
 import {
   createVectorPdfDocument,
   type PdfDocumentFonts,
 } from "@/lib/cut-plan/pdf-document-fonts";
 import { drawCutMapSheet, drawPdfTextLines } from "@/lib/cut-plan/pdf-draw-sheet-map";
-import { drawPdfText } from "@/lib/cut-plan/pdf-text";
+import { drawPdfText, measurePdfTextWidth } from "@/lib/cut-plan/pdf-text";
 
-export type { CutPlanPdfMeta, CutPlanPdfSheet } from "@/lib/cut-plan/cut-plan-pdf-shared";
+export type { CutPlanPdfMeta, CutPlanPdfPage } from "@/lib/cut-plan/cut-plan-pdf-shared";
 
 const PAGE_WIDTH_MM = 297; // A4 альбомная
 const PAGE_HEIGHT_MM = 210;
@@ -20,6 +29,12 @@ const MARGIN_Y_MM = 10;
 const FOOTER_HEIGHT_MM = 8;
 const SHEET_TITLE_HEIGHT_MM = 7;
 const PAGE_HEADER_HEIGHT_MM = 12;
+const LEGEND_LINE_HEIGHT_MM = 3.4;
+const LEGEND_FONT_SIZE_MM = 2.8;
+const LEGEND_GAP_AFTER_MM = 2;
+const STAMP_FONT_SIZE_MM = 3.2;
+const STAMP_PAD_X_MM = 3.5;
+const STAMP_PAD_Y_MM = 2.2;
 
 const CONTENT_WIDTH_MM = PAGE_WIDTH_MM - MARGIN_X_MM * 2;
 
@@ -45,6 +60,43 @@ function downloadPdf(bytes: Uint8Array, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Штамп вида операции: рамка, правый верх, UPPERCASE. */
+function drawOperationStamp(
+  page: PDFPage,
+  fonts: PdfDocumentFonts,
+  workKind: PdfWorkKind,
+) {
+  const text = pdfWorkKindStampLabel(workKind);
+  const sizePt = mmToPt(STAMP_FONT_SIZE_MM);
+  const textWidthPt = measurePdfTextWidth(fonts, text, sizePt, "semiBold");
+  const padXPt = mmToPt(STAMP_PAD_X_MM);
+  const padYPt = mmToPt(STAMP_PAD_Y_MM);
+  const boxWidthPt = textWidthPt + padXPt * 2;
+  const boxHeightPt = sizePt + padYPt * 2;
+  const pageHeightPt = page.getHeight();
+  const pageWidthPt = page.getWidth();
+  const xPt = pageWidthPt - mmToPt(MARGIN_X_MM) - boxWidthPt;
+  const yPt = pageHeightPt - mmToPt(MARGIN_Y_MM + 1) - boxHeightPt;
+
+  page.drawRectangle({
+    x: xPt,
+    y: yPt,
+    width: boxWidthPt,
+    height: boxHeightPt,
+    borderColor: rgb(PDF_COLORS.text.r, PDF_COLORS.text.g, PDF_COLORS.text.b),
+    borderWidth: 1.25,
+  });
+
+  drawPdfText(page, fonts, {
+    text,
+    x: xPt + padXPt,
+    y: yPt + padYPt * 0.85,
+    sizePt,
+    weight: "semiBold",
+    color: PDF_COLORS.text,
+  });
+}
+
 function drawPageChrome(
   page: PDFPage,
   fonts: PdfDocumentFonts,
@@ -52,14 +104,20 @@ function drawPageChrome(
   subtitle: string,
   pageIndex: number,
   totalPages: number,
+  workKind?: PdfWorkKind,
 ) {
+  // Заголовок слева — место справа под штамп (~70 мм).
+  const titleWidthMm = workKind
+    ? CONTENT_WIDTH_MM - 72
+    : CONTENT_WIDTH_MM;
+
   drawPdfTextLines(
     page,
     fonts,
     {
       xMm: MARGIN_X_MM,
       yTopMm: MARGIN_Y_MM,
-      widthMm: CONTENT_WIDTH_MM,
+      widthMm: titleWidthMm,
       heightMm: PAGE_HEADER_HEIGHT_MM,
     },
     [
@@ -72,6 +130,10 @@ function drawPageChrome(
       },
     ],
   );
+
+  if (workKind) {
+    drawOperationStamp(page, fonts, workKind);
+  }
 
   drawPdfTextLines(
     page,
@@ -98,6 +160,36 @@ function drawPageChrome(
       },
     ],
   );
+}
+
+function legendBlockHeightMm(lineCount: number) {
+  return lineCount * LEGEND_LINE_HEIGHT_MM + LEGEND_GAP_AFTER_MM;
+}
+
+function drawPageLegend(
+  page: PDFPage,
+  fonts: PdfDocumentFonts,
+  yTopMm: number,
+  lines: string[],
+) {
+  drawPdfTextLines(
+    page,
+    fonts,
+    {
+      xMm: MARGIN_X_MM,
+      yTopMm,
+      widthMm: CONTENT_WIDTH_MM,
+      heightMm: legendBlockHeightMm(lines.length),
+    },
+    lines.map((text, index) => ({
+      text,
+      yMm: (index + 1) * LEGEND_LINE_HEIGHT_MM - 0.6,
+      fontSizeMm: LEGEND_FONT_SIZE_MM,
+      color: PDF_COLORS.mutedText,
+    })),
+  );
+
+  return yTopMm + legendBlockHeightMm(lines.length);
 }
 
 function drawMaterialsSpecPage(
@@ -225,63 +317,131 @@ function drawMaterialsSpecPage(
   }
 }
 
-/** Один лист заготовки карты раскроя → одна страница A4; спецификация — последняя. */
-export async function buildCutPlanPdfBytes(meta: CutPlanPdfMeta, sheets: CutPlanPdfSheet[]) {
-  if (sheets.length === 0) {
-    throw new Error("Нет рассчитанных карт раскроя для выгрузки");
+function drawSheetContentPage(
+  page: PDFPage,
+  fonts: PdfDocumentFonts,
+  input: {
+    workKind: PdfWorkKind;
+    title: string;
+    partLines: CutPlanPdfPage["partLines"];
+    materialName: string;
+    blankSheetsCount: number;
+    sheet: Extract<CutPlanPdfPage, { kind: "cut_map" }>["sheet"];
+  },
+  projectTitle: string,
+  subtitle: string,
+  pageIndex: number,
+  totalPages: number,
+) {
+  drawPageChrome(
+    page,
+    fonts,
+    projectTitle,
+    subtitle,
+    pageIndex,
+    totalPages,
+    input.workKind,
+  );
+  let yTop = MARGIN_Y_MM + PAGE_HEADER_HEIGHT_MM;
+
+  drawPdfTextLines(
+    page,
+    fonts,
+    {
+      xMm: MARGIN_X_MM,
+      yTopMm: yTop,
+      widthMm: CONTENT_WIDTH_MM,
+      heightMm: SHEET_TITLE_HEIGHT_MM,
+    },
+    [
+      {
+        text: input.title,
+        yMm: 4.5,
+        fontSizeMm: 3.8,
+        bold: true,
+      },
+    ],
+  );
+  yTop += SHEET_TITLE_HEIGHT_MM;
+
+  const legendLines = buildPdfPageLegendLines({
+    partLines: input.partLines,
+    materialName: input.materialName,
+    blankSheetsCount: input.blankSheetsCount,
+  });
+  yTop = drawPageLegend(page, fonts, yTop, legendLines);
+
+  const mapHeightMm = PAGE_HEIGHT_MM - yTop - MARGIN_Y_MM - FOOTER_HEIGHT_MM;
+  drawCutMapSheet(
+    page,
+    fonts,
+    {
+      xMm: MARGIN_X_MM,
+      yTopMm: yTop,
+      widthMm: CONTENT_WIDTH_MM,
+      heightMm: Math.max(mapHeightMm, 40),
+    },
+    input.sheet,
+  );
+}
+
+/** Страницы карт/маркировки → A4; спецификация — последняя. */
+export async function buildCutPlanPdfBytes(
+  meta: CutPlanPdfMeta,
+  pages: CutPlanPdfPage[],
+) {
+  if (pages.length === 0) {
+    throw new Error("Нет карт раскроя и деталей под маркировку для выгрузки");
   }
 
   const { pdfDoc, fonts } = await createVectorPdfDocument();
   const includeSpec = Boolean(meta.materialsSpec);
-  const totalPages = sheets.length + (includeSpec ? 1 : 0);
+  const totalPages = pages.length + (includeSpec ? 1 : 0);
   const generatedAt = formatFileDate(new Date());
   const projectTitle = projectPdfTitle(meta);
   const subtitle = [meta.materialLabel, `ID ${meta.projectId}`, generatedAt]
     .filter(Boolean)
     .join(" · ");
 
-  for (let pageIndex = 0; pageIndex < sheets.length; pageIndex += 1) {
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
     const page = pdfDoc.addPage([mmToPt(PAGE_WIDTH_MM), mmToPt(PAGE_HEIGHT_MM)]);
-    const item = sheets[pageIndex]!;
-    let yTop = MARGIN_Y_MM;
+    const item = pages[pageIndex]!;
 
-    drawPageChrome(page, fonts, projectTitle, subtitle, pageIndex, totalPages);
-    yTop += PAGE_HEADER_HEIGHT_MM;
-
-    drawPdfTextLines(
-      page,
-      fonts,
-      {
-        xMm: MARGIN_X_MM,
-        yTopMm: yTop,
-        widthMm: CONTENT_WIDTH_MM,
-        heightMm: SHEET_TITLE_HEIGHT_MM,
-      },
-      [
+    if (item.kind === "cut_map") {
+      drawSheetContentPage(
+        page,
+        fonts,
         {
-          text: `${item.panelName} · Лист ${item.sheet.sheetIndex} · ${item.sheet.widthMm}×${item.sheet.heightMm} мм`,
-          yMm: 4.5,
-          fontSizeMm: 3.8,
-          bold: true,
+          workKind: item.workKind,
+          title: `${item.panelName} · Лист ${item.sheet.sheetIndex} · ${item.sheet.widthMm}×${item.sheet.heightMm} мм`,
+          partLines: item.partLines,
+          materialName: item.materialName,
+          blankSheetsCount: item.blankSheetsCount,
+          sheet: item.sheet,
         },
-      ],
-    );
-    yTop += SHEET_TITLE_HEIGHT_MM;
-
-    const mapHeightMm =
-      PAGE_HEIGHT_MM - yTop - MARGIN_Y_MM - FOOTER_HEIGHT_MM;
-
-    drawCutMapSheet(
-      page,
-      fonts,
-      {
-        xMm: MARGIN_X_MM,
-        yTopMm: yTop,
-        widthMm: CONTENT_WIDTH_MM,
-        heightMm: mapHeightMm,
-      },
-      item.sheet,
-    );
+        projectTitle,
+        subtitle,
+        pageIndex,
+        totalPages,
+      );
+    } else {
+      drawSheetContentPage(
+        page,
+        fonts,
+        {
+          workKind: item.workKind,
+          title: item.sheetTitle,
+          partLines: item.partLines,
+          materialName: item.materialName,
+          blankSheetsCount: item.blankSheetsCount,
+          sheet: item.sheet,
+        },
+        projectTitle,
+        subtitle,
+        pageIndex,
+        totalPages,
+      );
+    }
   }
 
   if (meta.materialsSpec) {
@@ -292,7 +452,7 @@ export async function buildCutPlanPdfBytes(meta: CutPlanPdfMeta, sheets: CutPlan
       meta.materialsSpec,
       projectTitle,
       subtitle,
-      sheets.length,
+      pages.length,
       totalPages,
     );
   }
@@ -300,7 +460,10 @@ export async function buildCutPlanPdfBytes(meta: CutPlanPdfMeta, sheets: CutPlan
   return pdfDoc.save();
 }
 
-export async function exportCutPlanPdf(meta: CutPlanPdfMeta, sheets: CutPlanPdfSheet[]) {
-  const bytes = await buildCutPlanPdfBytes(meta, sheets);
+export async function exportCutPlanPdf(
+  meta: CutPlanPdfMeta,
+  pages: CutPlanPdfPage[],
+) {
+  const bytes = await buildCutPlanPdfBytes(meta, pages);
   downloadPdf(bytes, `${sanitizeFileName(meta.projectName)}_raskroy.pdf`);
 }

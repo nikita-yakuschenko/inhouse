@@ -22,7 +22,10 @@ import {
   type PdfRgb,
 } from "@/lib/cut-plan/pdf-coordinates";
 import type { PdfDocumentFonts } from "@/lib/cut-plan/pdf-document-fonts";
-import { mapRotatedBadgeCorners } from "@/lib/cut-plan/pdf-label-geometry";
+import {
+  mapRotatedBadgeBounds,
+  rotatedTextBaselineSvg,
+} from "@/lib/cut-plan/pdf-label-geometry";
 import { drawPdfText, measurePdfTextWidth } from "@/lib/cut-plan/pdf-text";
 import { clipOffcutHatchLines } from "@/lib/cut-plan/offcut-hatch";
 import {
@@ -160,17 +163,7 @@ function drawLabelLayout(
       color,
       mapper,
     );
-    const sizePt = mapper.mapLength(layout.rightSide.fontSizeMm);
-    const anchor = mapper.mapPoint(layout.rightSide.xMm, layout.rightSide.yMm);
-    drawPdfText(page, fonts, {
-      text: layout.rightSide.text,
-      x: anchor.x,
-      y: anchor.y,
-      sizePt,
-      weight: "regular",
-      color,
-      rotate: degrees(layout.rightSide.rotateDeg ?? 0),
-    });
+    drawRotatedSideLabelText(page, layout.rightSide, fonts, color, mapper);
   }
 }
 
@@ -212,6 +205,32 @@ function drawOffcutLabelLayout(
   }
 }
 
+function drawRotatedSideLabelText(
+  page: PDFPage,
+  item: PartLabelText,
+  fonts: PdfDocumentFonts,
+  color: PdfRgb,
+  mapper: ReturnType<typeof createMapCoordinateMapper>,
+) {
+  const sizePt = mapper.mapLength(item.fontSizeMm);
+  const textWidthPt = measurePdfTextWidth(fonts, item.text, sizePt, "regular");
+  // Ширина в мм карты (scale учитывает mapper.mapLength).
+  const textWidthMm =
+    sizePt > 0 ? (item.fontSizeMm * textWidthPt) / sizePt : item.fontSizeMm;
+  const baseline = rotatedTextBaselineSvg(item, textWidthMm, item.fontSizeMm);
+  const origin = mapper.mapPoint(baseline.xMm, baseline.yMm);
+
+  drawPdfText(page, fonts, {
+    text: item.text,
+    x: origin.x,
+    y: origin.y,
+    sizePt,
+    weight: "regular",
+    color,
+    rotate: degrees(baseline.rotateDeg),
+  });
+}
+
 function drawRotatedBadge(
   page: PDFPage,
   anchor: PartLabelText,
@@ -219,30 +238,9 @@ function drawRotatedBadge(
   color: PdfRgb,
   mapper: ReturnType<typeof createMapCoordinateMapper>,
 ) {
-  const corners = mapRotatedBadgeCorners(anchor, badge, anchor.rotateDeg ?? 0);
-  const mapped = corners.map((corner) => mapper.mapPoint(corner.xMm, corner.yMm));
-  const [first, second, third, fourth] = mapped;
-  if (!first || !second || !third || !fourth) {
-    return;
-  }
-
-  page.drawSvgPath(
-    `M ${first.x} ${first.y} L ${second.x} ${second.y} L ${third.x} ${third.y} L ${fourth.x} ${fourth.y} Z`,
-    {
-      color: toColor({ r: 1, g: 1, b: 1 }),
-      borderWidth: 0,
-    },
-  );
-
-  const border = {
-    color,
-    widthMm: LABEL_BADGE_STROKE_MM,
-  };
-  for (let index = 0; index < corners.length; index += 1) {
-    const start = corners[index]!;
-    const end = corners[(index + 1) % corners.length]!;
-    drawSvgLine(page, start.xMm, start.yMm, end.xMm, end.yMm, mapper, border);
-  }
+  // Ось-align AABB: надёжная белая заливка (drawSvgPath fill часто не виден).
+  const bounds = mapRotatedBadgeBounds(anchor, badge, anchor.rotateDeg ?? 0);
+  drawBadge(page, bounds, color, mapper);
 }
 
 function drawOffcutHatch(

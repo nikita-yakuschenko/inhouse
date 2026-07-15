@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument } from "pdf-lib";
 
-import { collectCutPlanPdfSheets } from "@/lib/cut-plan/cut-plan-pdf-shared";
+import {
+  collectCutPlanPdfPages,
+  collectCutPlanPdfSheets,
+} from "@/lib/cut-plan/cut-plan-pdf-shared";
 import { buildCutPlanPdfBytes } from "@/lib/cut-plan/export-cut-plan-pdf";
 import { buildSheetMapSvg } from "@/lib/cut-plan/sheet-map-svg";
 import type { ClientPanel } from "@/features/projects/serialize-panels";
@@ -305,11 +308,149 @@ describe("collectCutPlanPdfSheets", () => {
       },
     ];
 
-    expect(collectCutPlanPdfSheets(panels)).toEqual([
+    const sheets = collectCutPlanPdfSheets(panels, {
+      materialLabel: "ЛДСП",
+    });
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]).toMatchObject({
+      kind: "cut_map",
+      workKind: "cutting_and_marking",
+      panelName: "Ст-1-01",
+      materialName: "ЛДСП",
+      blankSheetsCount: 1,
+      sheet: panels[0]!.cutPlans[0]!.sheets[0],
+    });
+  });
+});
+
+describe("collectCutPlanPdfPages", () => {
+  it("добавляет отдельную страницу маркировки после карт раскроя", async () => {
+    const panels: ClientPanel[] = [
       {
-        panelName: "Ст-1-01",
-        sheet: panels[0]!.cutPlans[0]!.sheets[0],
+        id: "pn01",
+        name: "Домокомплект",
+        code: null,
+        parts: [
+          {
+            id: "cut1",
+            name: "Обшивка Ст-1-01",
+            code: "01",
+            widthMm: 500,
+            heightMm: 300,
+            quantity: 1,
+            allowRotation: true,
+          },
+          {
+            id: "mark1",
+            name: "Плита Ст-2-01",
+            code: "01",
+            widthMm: 3000,
+            heightMm: 1250,
+            quantity: 3,
+            allowRotation: true,
+          },
+        ],
+        cutPlans: [
+          {
+            id: "cp01",
+            totalSheetsCount: 1,
+            totalOperationsCount: 0,
+            wastePercent: 5,
+            sheets: [
+              {
+                id: "sh01",
+                sheetIndex: 1,
+                widthMm: 3000,
+                heightMm: 1250,
+                usableXmm: 0,
+                usableYmm: 0,
+                usableWidthMm: 3000,
+                usableHeightMm: 1250,
+                placements: [
+                  {
+                    id: "pl1",
+                    partId: "cut1",
+                    partInstanceIndex: 1,
+                    xMm: 0,
+                    yMm: 0,
+                    widthMm: 500,
+                    heightMm: 300,
+                    rotationDeg: 0,
+                    label: "Ст-1-01-01",
+                  },
+                ],
+                operations: [],
+                plannedOffcuts: [],
+              },
+            ],
+          },
+        ],
       },
+    ];
+
+    const pages = collectCutPlanPdfPages(panels, {
+      materialsSpec: {
+        materialName: "Плита ГСПВ",
+        formatLabel: "3000×1250",
+        thicknessLabel: "12,5",
+        sheetsCount: 4,
+        sheetsAreaLabel: null,
+        partsAreaLabel: null,
+        wastePercentLabel: "9.2%",
+        markingSheets: 3,
+        cuttingSheets: 1,
+        hasCutPlan: true,
+      },
+      sheetWidthMm: 3000,
+      sheetHeightMm: 1250,
+    });
+
+    expect(pages).toHaveLength(2);
+    expect(pages[0]).toMatchObject({
+      kind: "cut_map",
+      workKind: "cutting_and_marking",
+      partLines: [{ marking: "Ст-1-01-01", quantity: 1 }],
+      blankSheetsCount: 1,
+      materialName: "Плита ГСПВ",
+    });
+    expect(pages[1]).toMatchObject({
+      kind: "marking_only",
+      workKind: "marking_only",
+      partLines: [{ marking: "Ст-2-01-01", quantity: 3 }],
+      blankSheetsCount: 3,
+      materialName: "Плита ГСПВ",
+      sheetTitle: "Ст-2-01-01 · целый лист · 3000×1250 мм",
+    });
+    expect(pages[1]!.kind === "marking_only" && pages[1].sheet.placements).toEqual([
+      expect.objectContaining({
+        label: "Ст-2-01-01",
+        widthMm: 3000,
+        heightMm: 1250,
+      }),
     ]);
+
+    const bytes = await buildCutPlanPdfBytes(
+      {
+        projectName: "456",
+        projectId: "pr-mark",
+        materialLabel: "Плита ГСПВ",
+        materialsSpec: {
+          materialName: "Плита ГСПВ",
+          formatLabel: "3000×1250",
+          thicknessLabel: "12,5",
+          sheetsCount: 4,
+          sheetsAreaLabel: "15.00 м²",
+          partsAreaLabel: "12.00 м²",
+          wastePercentLabel: "9.2%",
+          markingSheets: 3,
+          cuttingSheets: 1,
+          hasCutPlan: true,
+        },
+      },
+      pages,
+    );
+    const pdfDoc = await PDFDocument.load(bytes);
+    // карта + маркировка + спецификация
+    expect(pdfDoc.getPageCount()).toBe(3);
   });
 });

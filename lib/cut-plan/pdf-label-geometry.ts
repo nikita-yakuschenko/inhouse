@@ -1,7 +1,8 @@
 import type { LabelBadge, PartLabelText } from "@/lib/cut-plan/part-label-layout";
 import type { MmRect } from "@/lib/cut-plan/operator-view";
 
-function rotateLocalPoint(xMm: number, yMm: number, rotateDeg: number) {
+/** Локальный поворот как в SVG `rotate(deg)` (y вниз). */
+export function rotateLocalPoint(xMm: number, yMm: number, rotateDeg: number) {
   const radians = (rotateDeg * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
@@ -52,5 +53,24 @@ export function mapRotatedBadgeBounds(
     yMm: minY,
     widthMm: maxX - minX,
     heightMm: maxY - minY,
+  };
+}
+
+/**
+ * Левый baseline в SVG (y вниз) так, чтобы после translate+rotate
+ * визуальный центр текста был в якоре (middle / middle).
+ */
+export function rotatedTextBaselineSvg(
+  anchor: Pick<PartLabelText, "xMm" | "yMm" | "rotateDeg">,
+  textWidthMm: number,
+  fontSizeMm: number,
+) {
+  const rotateDeg = anchor.rotateDeg ?? 0;
+  // Как drawLabelText для middle: baseline ниже центра ~0.35 em.
+  const local = rotateLocalPoint(-textWidthMm / 2, fontSizeMm * 0.35, rotateDeg);
+  return {
+    xMm: anchor.xMm + local.xMm,
+    yMm: anchor.yMm + local.yMm,
+    rotateDeg,
   };
 }

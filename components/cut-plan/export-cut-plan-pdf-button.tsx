@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
-  collectCutPlanPdfSheets,
+  collectCutPlanPdfPages,
   type CutPlanPdfMeta,
 } from "@/lib/cut-plan/cut-plan-pdf-shared";
 import type { ClientPanel } from "@/features/projects/serialize-panels";
@@ -20,8 +20,8 @@ export function ExportCutPlanPdfButton({
   panels: ClientPanel[];
 }) {
   const [isPending, startTransition] = useTransition();
-  const sheets = collectCutPlanPdfSheets(panels);
-  const disabled = sheets.length === 0;
+  const pages = collectCutPlanPdfPages(panels, meta);
+  const disabled = pages.length === 0;
 
   return (
     <Button
@@ -33,7 +33,7 @@ export function ExportCutPlanPdfButton({
         startTransition(async () => {
           try {
             const { exportCutPlanPdf } = await import("@/lib/cut-plan/export-cut-plan-pdf");
-            await exportCutPlanPdf(meta, sheets);
+            await exportCutPlanPdf(meta, pages);
             toast.success("PDF сохранён");
           } catch (error) {
             toast.error(

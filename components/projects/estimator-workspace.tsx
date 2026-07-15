@@ -211,6 +211,8 @@ function EstimatorWorkspaceInner({
               projectId,
               contractNumber,
               materialLabel: sheetContext?.label ?? null,
+              sheetWidthMm: sheetContext?.sheetWidthMm ?? null,
+              sheetHeightMm: sheetContext?.sheetHeightMm ?? null,
               materialsSpec: buildMaterialsSpecSummary(
                 sheetContext,
                 allParts,
