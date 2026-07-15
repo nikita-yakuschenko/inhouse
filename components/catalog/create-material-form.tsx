@@ -53,26 +53,26 @@ export function CreateMaterialForm() {
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="material-width">Ширина листа, мм</Label>
+        <Label htmlFor="material-width">По станку (горизонт), мм</Label>
         <Input
           id="material-width"
           name="widthMm"
           type="number"
           required
           min={1}
-          placeholder="1250"
+          placeholder="3000"
           disabled={pending}
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="material-height">Длина листа, мм</Label>
+        <Label htmlFor="material-height">От упора (вертикаль), мм</Label>
         <Input
           id="material-height"
           name="heightMm"
           type="number"
           required
           min={1}
-          placeholder="3000"
+          placeholder="1250"
           disabled={pending}
         />
       </div>

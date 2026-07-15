@@ -90,7 +90,9 @@ export function MaterialsSpecification({
               </TableCell>
               <TableCell className="tabular-nums">{formatLabel}</TableCell>
               <TableCell className="text-right tabular-nums">
-                {sheetContext.thicknessMm ?? "—"}
+                {sheetContext.thicknessMm != null
+                  ? String(sheetContext.thicknessMm).replace(".", ",")
+                  : "—"}
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {sheetsCount ?? "—"}

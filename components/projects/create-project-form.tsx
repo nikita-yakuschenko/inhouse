@@ -17,6 +17,16 @@ const fieldClassName = cn(
   "disabled:cursor-not-allowed disabled:opacity-50",
 );
 
+/** Тонкий шеврон с отступом от правого края (вместо системного). */
+const selectChevron =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")";
+
+const selectClassName = cn(
+  fieldClassName,
+  "cursor-pointer appearance-none bg-no-repeat pr-9",
+  "bg-[length:12px_12px] bg-[position:right_12px_center]",
+);
+
 export function CreateProjectForm({
   materials: _materials,
   sheetFormats,
@@ -86,7 +96,7 @@ export function CreateProjectForm({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor="sheetFormatId">Материал</Label>
           <select
@@ -94,7 +104,8 @@ export function CreateProjectForm({
             name="sheetFormatId"
             required
             defaultValue={defaultSheet}
-            className={fieldClassName}
+            className={selectClassName}
+            style={{ backgroundImage: selectChevron }}
             disabled={pending}
           >
             {sheetFormats.map((sheet) => (
@@ -111,7 +122,8 @@ export function CreateProjectForm({
             name="machineProfileId"
             required
             defaultValue={defaultMachine}
-            className={fieldClassName}
+            className={selectClassName}
+            style={{ backgroundImage: selectChevron }}
             disabled={pending}
           >
             {machineProfiles.map((machine) => (

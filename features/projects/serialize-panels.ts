@@ -93,9 +93,21 @@ type ProjectWithSheetContext = {
   } | null;
 };
 
-function toMmNumber(value: number | { toNumber(): number } | null | undefined): number | null {
+function toMmNumber(
+  value: number | string | { toNumber(): number; toString(): string } | null | undefined,
+): number | null {
   if (value == null) return null;
-  return typeof value === "number" ? value : value.toNumber();
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const parsed = Number(value.trim().replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (typeof value.toNumber === "function") {
+    const parsed = value.toNumber();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const parsed = Number(value.toString());
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function withMmSuffix(name: string): string {
@@ -115,9 +127,13 @@ export function serializeSheetContext(
 
   const thicknessMm =
     toMmNumber(sheetFormat?.thicknessMm) ?? toMmNumber(material?.thicknessMm);
-  const label = sheetFormat
-    ? withMmSuffix(sheetFormat.name)
-    : withMmSuffix(material!.name);
+
+  // В шапке — полное имя материала, не только «3000×1250 мм».
+  const label = material?.name?.trim()
+    ? material.name.trim()
+    : sheetFormat
+      ? withMmSuffix(sheetFormat.name)
+      : "Материал";
 
   return {
     label,

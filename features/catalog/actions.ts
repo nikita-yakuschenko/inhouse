@@ -41,7 +41,10 @@ export async function createMaterialAction(formData: FormData) {
     };
   }
 
-  const { name, thicknessMm, widthMm, heightMm, materialType } = parsed.data;
+  const { name, thicknessMm, materialType } = parsed.data;
+  // На станке лист лежит альбомно: длинная сторона = ширина (горизонт).
+  const widthMm = Math.max(parsed.data.widthMm, parsed.data.heightMm);
+  const heightMm = Math.min(parsed.data.widthMm, parsed.data.heightMm);
   const sheetName = `${widthMm}×${heightMm}`;
 
   try {

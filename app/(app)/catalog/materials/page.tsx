@@ -51,8 +51,8 @@ export default async function MaterialsCatalogPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-6">Название</TableHead>
-                  <TableHead className="text-right">Ширина, мм</TableHead>
-                  <TableHead className="text-right">Длина, мм</TableHead>
+                  <TableHead className="text-right">По станку, мм</TableHead>
+                  <TableHead className="text-right">От упора, мм</TableHead>
                   <TableHead className="text-right">Толщина, мм</TableHead>
                   <TableHead className="pr-6 text-right">
                     <span className="sr-only">Действия</span>
