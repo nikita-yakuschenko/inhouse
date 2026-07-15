@@ -19,7 +19,7 @@ const estimatorLabels: WorkspaceLabels = {
   recent: "Недавние расчёты",
   newItem: "Новый расчёт",
   createSubmit: "Создать расчёт",
-  emptyList: "Расчётов пока нет. Создайте первый — укажите проект, материал и станок.",
+  emptyList: "Расчётов пока нет. Создайте первый — укажите проект и параметры.",
   openAction: "Открыть",
   tableTitle: "Расчёты раскроя",
   tableDescription:

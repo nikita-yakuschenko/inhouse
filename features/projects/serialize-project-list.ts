@@ -9,6 +9,9 @@ export type ProjectListRow = {
   technology: ProjectTechnologyValue | null;
   kind: ProjectKind;
   status: ProjectStatus;
+  sheetFormatId: string | null;
+  machineProfileId: string | null;
+  hasCutPlan: boolean;
   panelsCount: number;
   partsCount: number;
   partsQuantity: number;
@@ -22,9 +25,12 @@ type ProjectForList = {
   technology: ProjectTechnologyValue | null;
   kind: ProjectKind;
   status: ProjectStatus;
+  sheetFormatId: string | null;
+  machineProfileId: string | null;
   updatedAt: Date;
   panels: {
     parts: { name: string; code: string | null; quantity: number }[];
+    cutPlans?: { id: string }[];
   }[];
   barSegments?: { id: string; quantity: number }[];
   barCutPlans?: { totalBarsCount: number }[];
@@ -41,6 +47,9 @@ export function serializeProjectListRows(projects: ProjectForList[]): ProjectLis
         technology: project.technology,
         kind: project.kind,
         status: project.status,
+        sheetFormatId: null,
+        machineProfileId: null,
+        hasCutPlan: (project.barCutPlans?.length ?? 0) > 0,
         panelsCount: project.barCutPlans?.[0]?.totalBarsCount ?? 0,
         partsCount: segments.length,
         partsQuantity: segments.reduce((sum, s) => sum + s.quantity, 0),
@@ -49,6 +58,9 @@ export function serializeProjectListRows(projects: ProjectForList[]): ProjectLis
     }
 
     const parts = project.panels.flatMap((panel) => panel.parts);
+    const hasCutPlan = project.panels.some(
+      (panel) => (panel.cutPlans?.length ?? 0) > 0,
+    );
 
     return {
       id: project.id,
@@ -57,6 +69,9 @@ export function serializeProjectListRows(projects: ProjectForList[]): ProjectLis
       technology: project.technology,
       kind: project.kind,
       status: project.status,
+      sheetFormatId: project.sheetFormatId,
+      machineProfileId: project.machineProfileId,
+      hasCutPlan,
       panelsCount: countUniqueWallMarks(parts),
       partsCount: parts.length,
       partsQuantity: parts.reduce((sum, part) => sum + part.quantity, 0),

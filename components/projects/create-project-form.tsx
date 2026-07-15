@@ -48,7 +48,7 @@ const selectClassName = cn(
 
 export function CreateProjectForm({
   materials: _materials,
-  sheetFormats,
+  sheetFormats: _sheetFormats,
   machineProfiles,
   submitLabel = "Создать проект",
 }: {
@@ -61,51 +61,13 @@ export function CreateProjectForm({
   const [pending, startTransition] = useTransition();
   const [kind, setKind] = useState<"sheet" | "bar">("sheet");
 
-  const catalogReady = sheetFormats.length > 0 && machineProfiles.length > 0;
-
-  const defaultSheet =
-    sheetFormats.find((sheet) => sheet.isDefault)?.id ?? sheetFormats[0]?.id ?? "";
   const defaultMachine =
     machineProfiles.find((machine) => machine.isDefault)?.id ??
     machineProfiles[0]?.id ??
     "";
 
-  if (kind === "sheet" && !catalogReady) {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-2">
-          <Label htmlFor="kind-select">Вид раскроя</Label>
-          <select
-            id="kind-select"
-            className={selectClassName}
-            style={{ backgroundImage: selectChevron }}
-            value={kind}
-            onChange={(e) => setKind(e.target.value as "sheet" | "bar")}
-          >
-            <option value="sheet">Плиты (листовой материал)</option>
-            <option value="bar">Погонаж (заготовки и отрезки)</option>
-          </select>
-        </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
-          <h3 className="text-base font-semibold">Справочники не загружены</h3>
-          <p className="mt-2">
-            Для плитного раскроя добавьте материал в «Справочники → Материалы» и
-            профиль станка. Либо выберите погонаж.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   function handleSubmit(formData: FormData) {
     formData.set("kind", kind);
-    if (kind === "sheet") {
-      const sheetFormatId = String(formData.get("sheetFormatId") ?? "");
-      const sheet = sheetFormats.find((item) => item.id === sheetFormatId);
-      if (sheet) {
-        formData.set("materialId", sheet.materialId);
-      }
-    }
 
     startTransition(async () => {
       const result = await createProjectAction(formData);
@@ -184,32 +146,12 @@ export function CreateProjectForm({
             </select>
           </div>
 
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="sheetFormatId">Материал</Label>
-              <select
-                id="sheetFormatId"
-                name="sheetFormatId"
-                required
-                defaultValue={defaultSheet}
-                className={selectClassName}
-                style={{ backgroundImage: selectChevron }}
-                disabled={pending}
-              >
-                {sheetFormats.map((sheet) => (
-                  <option key={sheet.id} value={sheet.id}>
-                    {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×
-                    {Number(sheet.thicknessMm)}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {machineProfiles.length > 0 ? (
             <div className="grid gap-2">
               <Label htmlFor="machineProfileId">Станок</Label>
               <select
                 id="machineProfileId"
                 name="machineProfileId"
-                required
                 defaultValue={defaultMachine}
                 className={selectClassName}
                 style={{ backgroundImage: selectChevron }}
@@ -221,8 +163,17 @@ export function CreateProjectForm({
                   </option>
                 ))}
               </select>
+              <p className="text-muted-foreground text-xs">
+                Материал выбирается в проекте перед раскроем — его можно сменить
+                в любой момент.
+              </p>
             </div>
-          </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              Материал и станок можно указать в проекте перед раскроем. Добавьте
+              станок в «Справочники», если его ещё нет.
+            </p>
+          )}
         </>
       )}
 

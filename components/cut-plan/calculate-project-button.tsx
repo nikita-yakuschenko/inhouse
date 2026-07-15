@@ -4,19 +4,35 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { CutCalculateButton } from "@/components/cut-plan/cut-calculate-button";
 import { calculateProjectAction } from "@/features/cut-plans/actions";
-import { Button } from "@/components/ui/button";
 import { russianErrorMessage } from "@/lib/ui/notify";
 
-export function CalculateProjectButton({ projectId }: { projectId: string }) {
+export function CalculateProjectButton({
+  projectId,
+  disabled = false,
+  disabledReason,
+  className,
+}: {
+  projectId: string;
+  disabled?: boolean;
+  disabledReason?: string;
+  className?: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   return (
-    <Button
-      type="button"
-      disabled={isPending}
+    <CutCalculateButton
+      pending={isPending}
+      disabled={disabled}
+      className={className}
+      title={disabled ? disabledReason : undefined}
       onClick={() => {
+        if (disabled) {
+          toast.error(disabledReason ?? "Сначала выберите материал");
+          return;
+        }
         startTransition(async () => {
           try {
             await calculateProjectAction(projectId);
@@ -29,8 +45,6 @@ export function CalculateProjectButton({ projectId }: { projectId: string }) {
           }
         });
       }}
-    >
-      {isPending ? "Расчёт..." : "Раскроить проект"}
-    </Button>
+    />
   );
 }

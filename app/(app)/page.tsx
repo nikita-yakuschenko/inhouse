@@ -53,6 +53,8 @@ export default async function EstimatorHomePage() {
                 <EstimatorCalculationsTable
                   rows={rows}
                   emptyMessage={labels.emptyList}
+                  sheetFormats={catalog.sheetFormats}
+                  machineProfiles={catalog.machineProfiles}
                 />
               </CardContent>
             </Card>

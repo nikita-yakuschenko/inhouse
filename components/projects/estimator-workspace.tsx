@@ -8,8 +8,13 @@ import { ExportCutPlanPdfButton } from "@/components/cut-plan/export-cut-plan-pd
 import { SheetTabsPanel } from "@/components/cut-plan/sheet-tabs-panel";
 import { EstimatorPartsSection } from "@/components/projects/estimator-parts-section";
 import { MaterialsSpecification } from "@/components/projects/materials-specification";
+import { ProjectCuttingSetupSelects } from "@/components/projects/project-cutting-setup-selects";
+import type {
+  CatalogMachineOption,
+  CatalogSheetFormatOption,
+} from "@/components/projects/create-project-form";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ClientCutPlan, ClientPanel, ClientSheetContext } from "@/features/projects/serialize-panels";
 import {
@@ -21,16 +26,17 @@ import { getSheetIndicesForPart } from "@/lib/cut-plan/sheet-part-groups";
 import { buildMaterialsSpecSummary } from "@/lib/cut-plan/materials-spec";
 import { totalMaterialSheetsCount } from "@/lib/parts/part-work-type";
 
-const ESTIMATOR_TABS = ["parts", "cut", "spec"] as const;
+const ESTIMATOR_TABS = ["parts", "cut", "spec", "params"] as const;
 type EstimatorTab = (typeof ESTIMATOR_TABS)[number];
 
 function isEstimatorTab(value: string | null | undefined): value is EstimatorTab {
   return ESTIMATOR_TABS.includes(value as EstimatorTab);
 }
 
-/** Старые ссылки ?tab=ops → Спецификация */
+/** Старые ссылки ?tab=ops → Спецификация; params/parameters → Параметры */
 function resolveEstimatorTab(value: string | null | undefined): EstimatorTab | null {
   if (value === "ops" || value === "operations") return "spec";
+  if (value === "parameters") return "params";
   if (isEstimatorTab(value)) return value;
   return null;
 }
@@ -41,6 +47,10 @@ export function EstimatorWorkspace({
   contractNumber = null,
   panels,
   sheetContext,
+  sheetFormatId = null,
+  machineProfileId = null,
+  sheetFormats = [],
+  machineProfiles = [],
   initialSheetParam = null,
 }: {
   projectId: string;
@@ -48,6 +58,10 @@ export function EstimatorWorkspace({
   contractNumber?: string | null;
   panels: ClientPanel[];
   sheetContext: ClientSheetContext | null;
+  sheetFormatId?: string | null;
+  machineProfileId?: string | null;
+  sheetFormats?: CatalogSheetFormatOption[];
+  machineProfiles?: CatalogMachineOption[];
   initialSheetParam?: string | null;
 }) {
   return (
@@ -65,6 +79,10 @@ export function EstimatorWorkspace({
           contractNumber={contractNumber}
           panels={panels}
           sheetContext={sheetContext}
+          sheetFormatId={sheetFormatId}
+          machineProfileId={machineProfileId}
+          sheetFormats={sheetFormats}
+          machineProfiles={machineProfiles}
           initialSheetParam={initialSheetParam}
         />
       </Suspense>
@@ -78,6 +96,10 @@ function EstimatorWorkspaceInner({
   contractNumber,
   panels,
   sheetContext,
+  sheetFormatId,
+  machineProfileId,
+  sheetFormats,
+  machineProfiles,
   initialSheetParam,
 }: {
   projectId: string;
@@ -85,6 +107,10 @@ function EstimatorWorkspaceInner({
   contractNumber: string | null;
   panels: ClientPanel[];
   sheetContext: ClientSheetContext | null;
+  sheetFormatId: string | null;
+  machineProfileId: string | null;
+  sheetFormats: CatalogSheetFormatOption[];
+  machineProfiles: CatalogMachineOption[];
   initialSheetParam: string | null;
 }) {
   const router = useRouter();
@@ -204,34 +230,57 @@ function EstimatorWorkspaceInner({
           <Badge variant="outline">Раскрой не рассчитан</Badge>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
-          <ExportCutPlanPdfButton
-            meta={{
-              projectName,
-              projectId,
-              contractNumber,
-              materialLabel: sheetContext?.label ?? null,
-              sheetWidthMm: sheetContext?.sheetWidthMm ?? null,
-              sheetHeightMm: sheetContext?.sheetHeightMm ?? null,
-              materialsSpec: buildMaterialsSpecSummary(
-                sheetContext,
-                allParts,
-                cutPlan,
-              ),
-            }}
-            panels={panels}
+        <div className="ml-auto flex flex-wrap items-end justify-end gap-2">
+          <ProjectCuttingSetupSelects
+            projectId={projectId}
+            sheetFormatId={sheetFormatId}
+            machineProfileId={machineProfileId}
+            hasCutPlan={Boolean(cutPlan)}
+            sheetFormats={sheetFormats}
+            machineProfiles={machineProfiles}
           />
-          <CalculateProjectButton projectId={projectId} />
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-4 lg:p-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex h-full min-h-0 flex-col">
-          <TabsList>
-            <TabsTrigger value="parts">Детали</TabsTrigger>
-            <TabsTrigger value="cut">Карта раскроя</TabsTrigger>
-            <TabsTrigger value="spec">Спецификация</TabsTrigger>
-          </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="parts">Детали</TabsTrigger>
+              <TabsTrigger value="cut">Карта раскроя</TabsTrigger>
+              <TabsTrigger value="spec">Спецификация</TabsTrigger>
+              <TabsTrigger value="params">Параметры раскроя</TabsTrigger>
+            </TabsList>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <ExportCutPlanPdfButton
+                meta={{
+                  projectName,
+                  projectId,
+                  contractNumber,
+                  materialLabel: sheetContext?.label ?? null,
+                  sheetWidthMm: sheetContext?.sheetWidthMm ?? null,
+                  sheetHeightMm: sheetContext?.sheetHeightMm ?? null,
+                  materialsSpec: buildMaterialsSpecSummary(
+                    sheetContext,
+                    allParts,
+                    cutPlan,
+                  ),
+                }}
+                panels={panels}
+              />
+              <CalculateProjectButton
+                projectId={projectId}
+                disabled={!sheetFormatId || !machineProfileId}
+                disabledReason={
+                  !sheetFormatId
+                    ? "Сначала выберите материал"
+                    : !machineProfileId
+                      ? "Сначала выберите станок"
+                      : undefined
+                }
+              />
+            </div>
+          </div>
 
           <TabsContent value="parts" className="mt-4 min-h-0 flex-1">
             <EstimatorPartsSection
@@ -282,6 +331,18 @@ function EstimatorWorkspaceInner({
               cutPlan={cutPlan}
             />
           </TabsContent>
+
+          <TabsContent value="params" className="mt-4 min-h-0 flex-1">
+            <SheetCutParamsPanel
+              sheetContext={sheetContext}
+              sheetFormatId={sheetFormatId}
+              machineProfileId={machineProfileId}
+              sheetFormats={sheetFormats}
+              machineProfiles={machineProfiles}
+              cutPlan={cutPlan}
+              partsCount={allParts.length}
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -322,5 +383,90 @@ function CutPlanSummary({
         </CardHeader>
       </Card>
     </div>
+  );
+}
+
+function SheetCutParamsPanel({
+  sheetContext,
+  sheetFormatId,
+  machineProfileId,
+  sheetFormats,
+  machineProfiles,
+  cutPlan,
+  partsCount,
+}: {
+  sheetContext: ClientSheetContext | null;
+  sheetFormatId: string | null;
+  machineProfileId: string | null;
+  sheetFormats: CatalogSheetFormatOption[];
+  machineProfiles: CatalogMachineOption[];
+  cutPlan: ClientCutPlan | null;
+  partsCount: number;
+}) {
+  const sheet = sheetFormats.find((item) => item.id === sheetFormatId) ?? null;
+  const machine =
+    machineProfiles.find((item) => item.id === machineProfileId) ?? null;
+
+  const formatLabel = sheet
+    ? `${sheet.widthMm}×${sheet.heightMm}×${Number(sheet.thicknessMm)}`
+    : sheetContext?.sheetWidthMm != null && sheetContext.sheetHeightMm != null
+      ? `${sheetContext.sheetWidthMm}×${sheetContext.sheetHeightMm}`
+      : "—";
+
+  return (
+    <Card className="shadow-xs">
+      <CardHeader>
+        <CardTitle>Параметры раскроя</CardTitle>
+        <CardDescription>
+          Материал, станок и сводка последнего расчёта. Материал и станок меняются
+          в шапке проекта.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <p>
+          Материал:{" "}
+          <span className="font-medium">
+            {sheetContext?.materialName ?? sheet?.material.name ?? "не выбран"}
+          </span>
+        </p>
+        <p>
+          Формат листа: <span className="tabular-nums font-medium">{formatLabel}</span>
+        </p>
+        <p>
+          Станок:{" "}
+          <span className="font-medium">{machine?.name ?? "не выбран"}</span>
+        </p>
+        <p>
+          Деталей в проекте:{" "}
+          <span className="tabular-nums font-medium">{partsCount}</span>
+        </p>
+        {cutPlan ? (
+          <>
+            <p>
+              Листов в раскрое:{" "}
+              <span className="tabular-nums font-medium">
+                {cutPlan.totalSheetsCount}
+              </span>
+            </p>
+            <p>
+              Отход:{" "}
+              <span className="tabular-nums font-medium">
+                {Number(cutPlan.wastePercent ?? 0).toFixed(1)}%
+              </span>
+            </p>
+            <p>
+              Операций:{" "}
+              <span className="tabular-nums font-medium">
+                {cutPlan.totalOperationsCount}
+              </span>
+            </p>
+          </>
+        ) : (
+          <p className="text-muted-foreground">
+            Раскрой ещё не рассчитан — после расчёта здесь появится сводка.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

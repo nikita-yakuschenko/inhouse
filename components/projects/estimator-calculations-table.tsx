@@ -21,6 +21,10 @@ import {
 
 import { DeleteProjectButton } from "@/components/projects/delete-project-button";
 import { EditProjectButton } from "@/components/projects/edit-project-button";
+import type {
+  CatalogMachineOption,
+  CatalogSheetFormatOption,
+} from "@/components/projects/create-project-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,9 +66,13 @@ function SortableHeader({
 export function EstimatorCalculationsTable({
   rows,
   emptyMessage,
+  sheetFormats = [],
+  machineProfiles = [],
 }: {
   rows: ProjectListRow[];
   emptyMessage: string;
+  sheetFormats?: CatalogSheetFormatOption[];
+  machineProfiles?: CatalogMachineOption[];
 }) {
   const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([{ id: "updatedAt", desc: true }]);
@@ -161,6 +169,12 @@ export function EstimatorCalculationsTable({
               factoryNumber={row.original.name}
               contractNumber={row.original.contractNumber}
               technology={row.original.technology}
+              kind={row.original.kind}
+              sheetFormatId={row.original.sheetFormatId}
+              machineProfileId={row.original.machineProfileId}
+              hasCutPlan={row.original.hasCutPlan}
+              sheetFormats={sheetFormats}
+              machineProfiles={machineProfiles}
             />
             <DeleteProjectButton
               projectId={row.original.id}
@@ -171,7 +185,7 @@ export function EstimatorCalculationsTable({
         enableSorting: false,
       },
     ],
-    [],
+    [sheetFormats, machineProfiles],
   );
 
   const table = useReactTable({

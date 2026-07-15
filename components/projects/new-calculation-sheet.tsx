@@ -41,7 +41,8 @@ export function NewCalculationSheet({
         <SheetHeader>
           <SheetTitle>{labels.newItem}</SheetTitle>
           <SheetDescription>
-            Выберите плитный раскрой или погонаж, затем укажите параметры проекта.
+            Укажите вид раскроя и реквизиты. Материал для плит выбирается в
+            проекте перед раскроем.
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-6">

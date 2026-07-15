@@ -4,7 +4,7 @@ import { AppPage } from "@/components/app-page";
 import { BarWorkspace } from "@/components/bar/bar-workspace";
 import { EstimatorWorkspace } from "@/components/projects/estimator-workspace";
 import { SiteHeader } from "@/components/site-header";
-import { getProjectById } from "@/features/projects/queries";
+import { getCatalogDefaults, getProjectById } from "@/features/projects/queries";
 import { serializeBarWorkspace } from "@/features/projects/serialize-bar";
 import {
   serializePanelsForClient,
@@ -33,7 +33,10 @@ export default async function EstimatorProjectPage({
     notFound();
   }
 
-  const project = await getProjectById(id);
+  const [project, catalog] = await Promise.all([
+    getProjectById(id),
+    getCatalogDefaults(),
+  ]);
   if (!project) {
     notFound();
   }
@@ -64,6 +67,10 @@ export default async function EstimatorProjectPage({
         contractNumber={project.contractNumber}
         panels={serializePanelsForClient(project.panels)}
         sheetContext={serializeSheetContext(project)}
+        sheetFormatId={project.sheetFormatId}
+        machineProfileId={project.machineProfileId}
+        sheetFormats={catalog.sheetFormats}
+        machineProfiles={catalog.machineProfiles}
         initialSheetParam={query.sheet ?? null}
       />
     </AppPage>

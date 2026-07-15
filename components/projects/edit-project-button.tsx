@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type {
+  CatalogMachineOption,
+  CatalogSheetFormatOption,
+} from "@/components/projects/create-project-form";
 import { updateProjectAction } from "@/features/projects/actions";
 import {
   PROJECT_TECHNOLOGY_OPTIONS,
@@ -40,6 +44,12 @@ type EditProjectButtonProps = {
   factoryNumber: string;
   contractNumber: string | null;
   technology: ProjectTechnologyValue | null;
+  kind?: "sheet" | "bar";
+  sheetFormatId?: string | null;
+  machineProfileId?: string | null;
+  hasCutPlan?: boolean;
+  sheetFormats?: CatalogSheetFormatOption[];
+  machineProfiles?: CatalogMachineOption[];
 };
 
 export function EditProjectButton({
@@ -47,12 +57,21 @@ export function EditProjectButton({
   factoryNumber,
   contractNumber,
   technology,
+  kind = "sheet",
+  sheetFormatId = null,
+  machineProfileId = null,
+  hasCutPlan = false,
+  sheetFormats = [],
+  machineProfiles = [],
 }: EditProjectButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [name, setName] = useState(factoryNumber);
   const [contract, setContract] = useState(contractNumber ?? "");
   const [tech, setTech] = useState<ProjectTechnologyValue | "">(technology ?? "");
+  const [sheetId, setSheetId] = useState(sheetFormatId ?? "");
+  const [machineId, setMachineId] = useState(machineProfileId ?? "");
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -60,7 +79,59 @@ export function EditProjectButton({
     setName(factoryNumber);
     setContract(contractNumber ?? "");
     setTech(technology ?? "");
-  }, [open, factoryNumber, contractNumber, technology]);
+    setSheetId(sheetFormatId ?? "");
+    setMachineId(machineProfileId ?? "");
+  }, [
+    open,
+    factoryNumber,
+    contractNumber,
+    technology,
+    sheetFormatId,
+    machineProfileId,
+  ]);
+
+  const isSheet = kind === "sheet";
+  const needsTechnology = technology === "pkd" || technology === "md";
+
+  function setupChanged() {
+    const materialChanged = (sheetId || null) !== (sheetFormatId || null);
+    const machineChanged = (machineId || null) !== (machineProfileId || null);
+    return materialChanged || machineChanged;
+  }
+
+  function persist() {
+    startTransition(async () => {
+      const result = await updateProjectAction({
+        projectId,
+        name: name.trim(),
+        contractNumber: contract.trim(),
+        technology: needsTechnology ? tech : null,
+        ...(isSheet
+          ? {
+              sheetFormatId: sheetId || null,
+              machineProfileId: machineId || null,
+            }
+          : {}),
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+
+      setConfirmOpen(false);
+      setOpen(false);
+      if (result.recalculated) {
+        toast.success("Раскрой пересчитан", {
+          description: "Параметры сохранены, карта раскроя обновлена.",
+        });
+      } else {
+        toast.success("Расчёт обновлён", {
+          description: result.name,
+        });
+      }
+      router.refresh();
+    });
+  }
 
   function handleSave() {
     const nextName = name.trim();
@@ -74,137 +145,200 @@ export function EditProjectButton({
       toast.error("Укажите номер договора");
       return;
     }
-    const needsTechnology = technology === "pkd" || technology === "md";
     if (needsTechnology && tech !== "pkd" && tech !== "md") {
       toast.error("Выберите технологию");
       return;
     }
 
-    if (
+    const unchanged =
       nextName === factoryNumber &&
       nextContract === (contractNumber ?? "") &&
-      tech === (technology ?? "")
-    ) {
+      tech === (technology ?? "") &&
+      !setupChanged();
+
+    if (unchanged) {
       setOpen(false);
       return;
     }
 
-    startTransition(async () => {
-      const result = await updateProjectAction({
-        projectId,
-        name: nextName,
-        contractNumber: nextContract,
-        technology: needsTechnology ? tech : null,
-      });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
+    if (isSheet && hasCutPlan && setupChanged()) {
+      setConfirmOpen(true);
+      return;
+    }
 
-      setOpen(false);
-      toast.success("Расчёт обновлён", {
-        description: result.name,
-      });
-      router.refresh();
-    });
+    persist();
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
-          aria-label={`Редактировать «${factoryNumber}»`}
-          title="Редактировать"
-          disabled={pending}
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
+    <>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+            aria-label={`Редактировать «${factoryNumber}»`}
+            title="Редактировать"
+            disabled={pending}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <IconPencil className="size-4" stroke={1.75} />
+          </button>
+        </AlertDialogTrigger>
+        <AlertDialogContent
+          onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
-          <IconPencil className="size-4" stroke={1.75} />
-        </button>
-      </AlertDialogTrigger>
-      <AlertDialogContent
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => event.stopPropagation()}
-      >
-        <AlertDialogHeader>
-          <AlertDialogTitle>Редактировать расчёт</AlertDialogTitle>
-          <AlertDialogDescription>
-            Измените реквизиты расчёта. Материал и станок остаются без изменений.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Редактировать расчёт</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isSheet
+                ? "Можно изменить реквизиты, материал и станок. При смене материала или станка сохранённый раскрой будет пересчитан."
+                : "Измените реквизиты расчёта."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-        <div className="grid gap-3 py-1">
-          <div className="grid gap-2">
-            <Label htmlFor={`factory-number-${projectId}`}>
-              Заводской номер домокомплекта
-            </Label>
-            <Input
-              id={`factory-number-${projectId}`}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={pending}
-              autoFocus
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor={`contract-number-${projectId}`}>Номер договора</Label>
-            <Input
-              id={`contract-number-${projectId}`}
-              value={contract}
-              onChange={(event) => setContract(event.target.value)}
-              disabled={pending}
-            />
-          </div>
-
-          {(technology === "pkd" || technology === "md") && (
+          <div className="grid gap-3 py-1">
             <div className="grid gap-2">
-              <Label htmlFor={`technology-${projectId}`}>Технология</Label>
-              <select
-                id={`technology-${projectId}`}
-                value={tech}
-                onChange={(event) =>
-                  setTech(event.target.value as ProjectTechnologyValue | "")
-                }
-                className={selectClassName}
-                style={{ backgroundImage: selectChevron }}
+              <Label htmlFor={`factory-number-${projectId}`}>
+                {isSheet ? "Заводской номер домокомплекта" : "Название"}
+              </Label>
+              <Input
+                id={`factory-number-${projectId}`}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
                 disabled={pending}
-              >
-                <option value="" disabled>
-                  Выберите технологию
-                </option>
-                {PROJECT_TECHNOLOGY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                autoFocus
+              />
             </div>
-          )}
-        </div>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Отмена</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={
-              pending ||
-              !name.trim() ||
-              !contract.trim() ||
-              ((technology === "pkd" || technology === "md") && !tech)
-            }
-            onClick={(event) => {
-              event.preventDefault();
-              handleSave();
-            }}
-          >
-            {pending ? "Сохранение…" : "Сохранить"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            <div className="grid gap-2">
+              <Label htmlFor={`contract-number-${projectId}`}>Номер договора</Label>
+              <Input
+                id={`contract-number-${projectId}`}
+                value={contract}
+                onChange={(event) => setContract(event.target.value)}
+                disabled={pending}
+              />
+            </div>
+
+            {needsTechnology && (
+              <div className="grid gap-2">
+                <Label htmlFor={`technology-${projectId}`}>Технология</Label>
+                <select
+                  id={`technology-${projectId}`}
+                  value={tech}
+                  onChange={(event) =>
+                    setTech(event.target.value as ProjectTechnologyValue | "")
+                  }
+                  className={selectClassName}
+                  style={{ backgroundImage: selectChevron }}
+                  disabled={pending}
+                >
+                  <option value="" disabled>
+                    Выберите технологию
+                  </option>
+                  {PROJECT_TECHNOLOGY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {isSheet && sheetFormats.length > 0 ? (
+              <div className="grid gap-2">
+                <Label htmlFor={`material-${projectId}`}>Материал</Label>
+                <select
+                  id={`material-${projectId}`}
+                  value={sheetId}
+                  onChange={(event) => setSheetId(event.target.value)}
+                  className={selectClassName}
+                  style={{ backgroundImage: selectChevron }}
+                  disabled={pending}
+                >
+                  <option value="">Не выбран</option>
+                  {sheetFormats.map((sheet) => (
+                    <option key={sheet.id} value={sheet.id}>
+                      {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×
+                      {Number(sheet.thicknessMm)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {isSheet && machineProfiles.length > 0 ? (
+              <div className="grid gap-2">
+                <Label htmlFor={`machine-${projectId}`}>Станок</Label>
+                <select
+                  id={`machine-${projectId}`}
+                  value={machineId}
+                  onChange={(event) => setMachineId(event.target.value)}
+                  className={selectClassName}
+                  style={{ backgroundImage: selectChevron }}
+                  disabled={pending}
+                >
+                  <option value="">Не выбран</option>
+                  {machineProfiles.map((machine) => (
+                    <option key={machine.id} value={machine.id}>
+                      {machine.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                pending ||
+                !name.trim() ||
+                !contract.trim() ||
+                (needsTechnology && !tech)
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                handleSave();
+              }}
+            >
+              {pending ? "Сохранение…" : "Сохранить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Пересчитать раскрой?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Материал или станок изменились. Сохранённый раскрой будет
+              автоматически пересчитан. Продолжить?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={pending}
+              onClick={(event) => {
+                event.preventDefault();
+                persist();
+              }}
+            >
+              {pending ? "Пересчёт…" : "Сохранить и пересчитать"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
