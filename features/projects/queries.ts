@@ -16,6 +16,15 @@ const panelCutPlanInclude = {
   },
 };
 
+export async function getRecentProjectsForNav(limit = 5) {
+  return prisma.project.findMany({
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    select: { id: true, name: true },
+  });
+}
+
+/** Список проектов без карт раскроя — иначе layout/home съедают память. */
 export async function getProjects() {
   return prisma.project.findMany({
     orderBy: { updatedAt: "desc" },
@@ -23,8 +32,16 @@ export async function getProjects() {
       panels: {
         orderBy: { sortOrder: "asc" },
         include: {
-          parts: { orderBy: [{ code: "asc" }, { createdAt: "asc" }] },
-          cutPlans: panelCutPlanInclude,
+          parts: { select: { id: true, quantity: true } },
+          cutPlans: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              totalSheetsCount: true,
+              wastePercent: true,
+            },
+          },
         },
       },
     },

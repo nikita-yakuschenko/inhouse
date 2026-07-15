@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isMarkingOnlyPart, partitionPartsByWorkType } from "@/lib/parts/part-work-type";
+import { isMarkingOnlyPart, markingOnlySheetsCount, partitionPartsByWorkType, totalMaterialSheetsCount } from "@/lib/parts/part-work-type";
 
 describe("part-work-type", () => {
   it("считает полный лист только маркировкой", () => {
@@ -21,5 +21,30 @@ describe("part-work-type", () => {
 
     expect(cuttingAndMarking.map((p) => p.id)).toEqual(["a"]);
     expect(markingOnly.map((p) => p.id)).toEqual(["b"]);
+  });
+
+  it("считает листы заказа: раскрой + маркировка", () => {
+    expect(
+      markingOnlySheetsCount(
+        [
+          { widthMm: 1250, heightMm: 2680, quantity: 2 },
+          { widthMm: 1250, heightMm: 3000, quantity: 5 },
+        ],
+        1250,
+        3000,
+      ),
+    ).toBe(5);
+
+    expect(
+      totalMaterialSheetsCount(
+        6,
+        [
+          { widthMm: 1250, heightMm: 2680, quantity: 2 },
+          { widthMm: 1250, heightMm: 3000, quantity: 5 },
+        ],
+        1250,
+        3000,
+      ),
+    ).toBe(11);
   });
 });

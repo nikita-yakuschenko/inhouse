@@ -3,6 +3,24 @@ import prisma from "@/lib/db/prisma";
 import { buildEngineInput } from "@/lib/engine/build-input";
 import { runCuttingEngine } from "@/lib/engine";
 import { generateEntityId } from "@/lib/id";
+import { markingOnlySheetsCount } from "@/lib/parts/part-work-type";
+
+const EMPTY_CUT_RESULT: EngineResult = {
+  status: "success",
+  algorithmVersion: "0.3.0",
+  score: 0,
+  metrics: {
+    sheetsCount: 0,
+    partsAreaMm2: 0,
+    wasteAreaMm2: 0,
+    wastePercent: 0,
+    operationsCount: 0,
+    manualOperationsCount: 0,
+    setupChangesCount: 0,
+  },
+  sheets: [],
+  warnings: [],
+};
 
 async function saveCutPlanResult(params: {
   projectId: string;
@@ -187,6 +205,27 @@ export async function calculatePanel(panelId: string): Promise<string> {
     machineProfile,
   });
 
+  // Нет деталей для раскроя — только целые листы под маркировку.
+  if (engineInput.parts.length === 0) {
+    const markingSheets = markingOnlySheetsCount(
+      panel.parts,
+      sheetFormat.widthMm,
+      sheetFormat.heightMm,
+    );
+    if (markingSheets === 0) {
+      throw new Error("Добавьте хотя бы одну деталь на панель");
+    }
+    return saveCutPlanResult({
+      projectId: project.id,
+      panelId: panel.id,
+      machineProfileId: machineProfile.id,
+      sheetFormatId: sheetFormat.id,
+      materialId: material.id,
+      engineInput,
+      result: EMPTY_CUT_RESULT,
+    });
+  }
+
   const result = runCuttingEngine(engineInput);
 
   return saveCutPlanResult({
@@ -250,6 +289,26 @@ export async function calculateProject(projectId: string): Promise<string> {
     sheetFormat,
     machineProfile,
   });
+
+  if (engineInput.parts.length === 0) {
+    const markingSheets = markingOnlySheetsCount(
+      project.parts,
+      sheetFormat.widthMm,
+      sheetFormat.heightMm,
+    );
+    if (markingSheets === 0) {
+      throw new Error("Добавьте хотя бы одну деталь");
+    }
+    return saveCutPlanResult({
+      projectId: project.id,
+      panelId: targetPanelId,
+      machineProfileId: machineProfile.id,
+      sheetFormatId: sheetFormat.id,
+      materialId: material.id,
+      engineInput,
+      result: EMPTY_CUT_RESULT,
+    });
+  }
 
   const result = runCuttingEngine(engineInput);
 

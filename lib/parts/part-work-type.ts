@@ -32,3 +32,23 @@ export function partitionPartsByWorkType<T extends Pick<ClientPart, "widthMm" | 
 
   return { cuttingAndMarking, markingOnly };
 }
+
+/** Сколько целых листов нужно под детали «только маркировка». */
+export function markingOnlySheetsCount(
+  parts: Pick<ClientPart, "widthMm" | "heightMm" | "quantity">[],
+  sheetWidthMm: number | null | undefined,
+  sheetHeightMm: number | null | undefined,
+): number {
+  const { markingOnly } = partitionPartsByWorkType(parts, sheetWidthMm, sheetHeightMm);
+  return markingOnly.reduce((sum, part) => sum + part.quantity, 0);
+}
+
+/** Листы раскроя + листы под маркировку без резки. */
+export function totalMaterialSheetsCount(
+  cuttingSheetsCount: number,
+  parts: Pick<ClientPart, "widthMm" | "heightMm" | "quantity">[],
+  sheetWidthMm: number | null | undefined,
+  sheetHeightMm: number | null | undefined,
+): number {
+  return cuttingSheetsCount + markingOnlySheetsCount(parts, sheetWidthMm, sheetHeightMm);
+}

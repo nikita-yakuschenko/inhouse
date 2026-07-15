@@ -4,6 +4,10 @@ import type {
   ClientSheetContext,
 } from "@/features/projects/serialize-panels";
 import {
+  markingOnlySheetsCount,
+  totalMaterialSheetsCount,
+} from "@/lib/parts/part-work-type";
+import {
   Table,
   TableBody,
   TableCell,
@@ -33,12 +37,19 @@ export function MaterialsSpecification({
     );
   }
 
-  const sheetAreaMm2 =
-    sheetContext.sheetWidthMm && sheetContext.sheetHeightMm
-      ? sheetContext.sheetWidthMm * sheetContext.sheetHeightMm
+  const sheetW = sheetContext.sheetWidthMm;
+  const sheetH = sheetContext.sheetHeightMm;
+
+  const sheetAreaMm2 = sheetW && sheetH ? sheetW * sheetH : null;
+
+  const markingSheets = markingOnlySheetsCount(parts, sheetW, sheetH);
+  const cuttingSheets = cutPlan?.totalSheetsCount ?? 0;
+  // Целые листы под маркировку всегда в заказе; листы раскроя — после расчёта.
+  const sheetsCount =
+    cutPlan || markingSheets > 0
+      ? totalMaterialSheetsCount(cuttingSheets, parts, sheetW, sheetH)
       : null;
 
-  const sheetsCount = cutPlan?.totalSheetsCount ?? null;
   const sheetsAreaMm2 =
     sheetAreaMm2 !== null && sheetsCount !== null ? sheetAreaMm2 * sheetsCount : null;
 
@@ -47,24 +58,21 @@ export function MaterialsSpecification({
     0,
   );
 
+  // Отход по всей закупке: площадь листов минус площадь всех деталей.
   const wastePercent =
-    cutPlan?.wastePercent !== null && cutPlan?.wastePercent !== undefined
-      ? Number(cutPlan.wastePercent)
-      : sheetsAreaMm2 && sheetsAreaMm2 > 0
-        ? Math.max(0, ((sheetsAreaMm2 - partsAreaMm2) / sheetsAreaMm2) * 100)
-        : null;
+    sheetsAreaMm2 && sheetsAreaMm2 > 0
+      ? Math.max(0, ((sheetsAreaMm2 - partsAreaMm2) / sheetsAreaMm2) * 100)
+      : null;
 
   const formatLabel =
-    sheetContext.sheetWidthMm && sheetContext.sheetHeightMm
-      ? `${sheetContext.sheetWidthMm}×${sheetContext.sheetHeightMm}`
-      : (sheetContext.sheetFormatName ?? "—");
+    sheetW && sheetH ? `${sheetW}×${sheetH}` : (sheetContext.sheetFormatName ?? "—");
 
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h3 className="text-base font-semibold">Спецификация материалов</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ведомость листовых материалов к заказу по текущему расчёту
+          Ведомость листовых материалов к заказу: раскрой + целые листы под маркировку
         </p>
       </div>
 
@@ -110,9 +118,16 @@ export function MaterialsSpecification({
           </TableBody>
         </Table>
 
-        {!cutPlan ? (
+        {markingSheets > 0 ? (
           <p className="border-t px-6 py-3 text-sm text-muted-foreground">
-            Раскрой не рассчитан — количество листов и отход появятся после расчёта
+            В том числе целых листов под маркировку без раскроя: {markingSheets}
+            {cutPlan
+              ? ` · листов в раскрое: ${cuttingSheets}`
+              : " · раскрой ещё не рассчитан"}
+          </p>
+        ) : !cutPlan ? (
+          <p className="border-t px-6 py-3 text-sm text-muted-foreground">
+            Раскрой не рассчитан — количество листов раскроя появится после расчёта
           </p>
         ) : null}
       </div>

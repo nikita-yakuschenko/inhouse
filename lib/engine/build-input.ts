@@ -6,6 +6,7 @@ import type {
   Project,
   SheetFormat,
 } from "@/app/generated/prisma/client";
+import { partitionPartsByWorkType } from "@/lib/parts/part-work-type";
 
 function comparePartsBySpecOrder(a: Part, b: Part): number {
   const codeA = a.code ?? "";
@@ -24,6 +25,13 @@ export function buildEngineInput(params: {
   machineProfile: MachineProfile;
 }): EngineInput {
   const { project, parts, sheetFormat, machineProfile } = params;
+
+  // Целые листы (только маркировка) в раскрой не кладём — отдельной позицией в спецификации.
+  const { cuttingAndMarking } = partitionPartsByWorkType(
+    parts,
+    sheetFormat.widthMm,
+    sheetFormat.heightMm,
+  );
 
   return {
     projectId: project.id,
@@ -50,7 +58,7 @@ export function buildEngineInput(params: {
       trimTopMm: 0,
       trimBottomMm: 0,
     },
-    parts: [...parts].sort(comparePartsBySpecOrder).map((part) => ({
+    parts: [...cuttingAndMarking].sort(comparePartsBySpecOrder).map((part) => ({
       id: part.id,
       name: part.name,
       code: part.code ?? undefined,

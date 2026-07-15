@@ -121,12 +121,13 @@ function findFreeSlotInStrip(
         continue;
       }
 
-      // Ниже и левее — меньше обрезков; штраф за неиспользуемую площадь слота.
+      // Ниже и левее — меньше обрезков; одновысотные в ряду — рядом.
       const waste =
         yMm * 1_000_000 +
         xMm * 1_000 +
         (stripRight - xMm - orientation.widthMm) +
-        (usableTop - yMm - orientation.heightMm);
+        (usableTop - yMm - orientation.heightMm) +
+        sameHeightRowPenalty(strip.parts, orientation, xMm, yMm, kerfMm);
 
       if (!best || waste < best.waste) {
         best = { xMm, yMm, waste };
@@ -135,6 +136,102 @@ function findFreeSlotInStrip(
   }
 
   return best;
+}
+
+/**
+ * В одном ряду (одинаковый y) одновысотные детали — рядом.
+ */
+function sameHeightRowPenalty(
+  parts: PlacedPart[],
+  orientation: Orientation,
+  xMm: number,
+  yMm: number,
+  kerfMm: number,
+): number {
+  const row = parts.filter((part) => Math.abs(part.yMm - yMm) < 0.5);
+  if (row.length === 0) return 0;
+
+  const sameHeight = row.filter(
+    (part) => Math.abs(part.heightMm - orientation.heightMm) < 0.5,
+  );
+
+  for (const part of sameHeight) {
+    const touchesLeft = Math.abs(part.xMm + part.widthMm + kerfMm - xMm) < 0.5;
+    const touchesRight =
+      Math.abs(xMm + orientation.widthMm + kerfMm - part.xMm) < 0.5;
+    if (touchesLeft || touchesRight) return -50_000;
+  }
+
+  if (sameHeight.length === 0) return 0;
+
+  const leftNeighbor = row
+    .filter((part) => part.xMm + part.widthMm <= xMm + 0.5)
+    .sort((a, b) => b.xMm - a.xMm)[0];
+  if (
+    leftNeighbor &&
+    Math.abs(leftNeighbor.heightMm - orientation.heightMm) >= 0.5 &&
+    sameHeight.some((part) => part.xMm > xMm)
+  ) {
+    return 40_000;
+  }
+
+  const dist = Math.min(...sameHeight.map((part) => Math.abs(part.xMm - xMm)));
+  return dist;
+}
+
+/** В каждом ряду собрать детали одной высоты подряд слева направо. */
+function regroupSameYByHeight(sheet: PackedSheet, kerfMm: number): void {
+  for (const strip of sheet.strips) {
+    const byY = new Map<number, PlacedPart[]>();
+    for (const part of strip.parts) {
+      const key = Math.round(part.yMm * 100) / 100;
+      const list = byY.get(key) ?? [];
+      list.push(part);
+      byY.set(key, list);
+    }
+
+    for (const row of byY.values()) {
+      if (row.length < 2) continue;
+
+      const previous = row.map((part) => ({ part, xMm: part.xMm }));
+      row.sort((a, b) => {
+        if (a.heightMm !== b.heightMm) return b.heightMm - a.heightMm;
+        if (a.widthMm !== b.widthMm) return b.widthMm - a.widthMm;
+        return (a.partCode ?? "").localeCompare(b.partCode ?? "", "ru", {
+          numeric: true,
+        });
+      });
+
+      const startX = Math.min(...previous.map((item) => item.xMm));
+      let x = startX;
+      for (const part of row) {
+        part.xMm = x;
+        x += part.widthMm + kerfMm;
+      }
+
+      const overflow = row.some(
+        (part) => part.xMm + part.widthMm > strip.xMm + strip.widthMm + 0.01,
+      );
+      const collision = row.some((part) =>
+        strip.parts.some(
+          (other) =>
+            other !== part &&
+            Math.abs(other.yMm - part.yMm) >= 0.5 &&
+            overlapsWithKerf(part, other, kerfMm),
+        ),
+      );
+      if (overflow || collision) {
+        for (const item of previous) {
+          item.part.xMm = item.xMm;
+        }
+      }
+    }
+  }
+
+  sheet.placements.sort((a, b) => {
+    if (a.yMm !== b.yMm) return a.yMm - b.yMm;
+    return a.xMm - b.xMm;
+  });
 }
 
 function placeInStripAt(
@@ -369,6 +466,9 @@ export function packParts(
 
   if (axis === "vertical") {
     compactIntoGaps(sheets, usable, kerfMm);
+    for (const sheet of sheets) {
+      regroupSameYByHeight(sheet, kerfMm);
+    }
   }
 
   return sheets;

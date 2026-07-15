@@ -18,6 +18,7 @@ import {
   getSheetIndexParam,
 } from "@/lib/cut-plan/panel-workspace-state";
 import { getSheetIndicesForPart } from "@/lib/cut-plan/sheet-part-groups";
+import { totalMaterialSheetsCount } from "@/lib/parts/part-work-type";
 
 const ESTIMATOR_TABS = ["parts", "cut", "spec"] as const;
 type EstimatorTab = (typeof ESTIMATOR_TABS)[number];
@@ -161,6 +162,17 @@ function EstimatorWorkspaceInner({
     replaceQuery({ tab: value });
   }
 
+  const materialSheetsCount = useMemo(
+    () =>
+      totalMaterialSheetsCount(
+        cutPlan?.totalSheetsCount ?? 0,
+        allParts,
+        sheetContext?.sheetWidthMm,
+        sheetContext?.sheetHeightMm,
+      ),
+    [allParts, cutPlan?.totalSheetsCount, sheetContext],
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3 lg:px-6">
@@ -171,12 +183,14 @@ function EstimatorWorkspaceInner({
           <p className="text-xs text-muted-foreground">{allParts.length} дет.</p>
         </div>
 
-        {cutPlan ? (
+        {cutPlan || materialSheetsCount > 0 ? (
           <>
-            <Badge variant="secondary">{cutPlan.totalSheetsCount} листов</Badge>
-            <Badge variant="secondary">
-              Отход {Number(cutPlan.wastePercent ?? 0).toFixed(1)}%
-            </Badge>
+            <Badge variant="secondary">{materialSheetsCount} листов</Badge>
+            {cutPlan ? (
+              <Badge variant="secondary">
+                Отход {Number(cutPlan.wastePercent ?? 0).toFixed(1)}%
+              </Badge>
+            ) : null}
           </>
         ) : (
           <Badge variant="outline">Раскрой не рассчитан</Badge>
@@ -214,13 +228,24 @@ function EstimatorWorkspaceInner({
           </TabsContent>
 
           <TabsContent value="cut" className="mt-4 min-h-0 flex-1">
-            {!cutPlan || !activeSheet ? (
+            {!cutPlan ? (
               <div className="flex h-[min(24rem,60vh)] items-center justify-center rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
                 Выполните расчёт — карта раскроя появится на этой вкладке
               </div>
+            ) : !activeSheet ? (
+              <div className="flex h-[min(24rem,60vh)] flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
+                <CutPlanSummary
+                  cutPlan={cutPlan}
+                  materialSheetsCount={materialSheetsCount}
+                />
+                <p>Деталей для раскроя нет — только целые листы под маркировку</p>
+              </div>
             ) : (
               <div className="flex h-[min(48rem,calc(100vh-16rem))] min-h-96 flex-col gap-4">
-                <CutPlanSummary cutPlan={cutPlan} />
+                <CutPlanSummary
+                  cutPlan={cutPlan}
+                  materialSheetsCount={materialSheetsCount}
+                />
                 <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
                   <SheetTabsPanel
                     sheets={cutPlan.sheets}
@@ -247,12 +272,26 @@ function EstimatorWorkspaceInner({
   );
 }
 
-function CutPlanSummary({ cutPlan }: { cutPlan: ClientCutPlan }) {
+function CutPlanSummary({
+  cutPlan,
+  materialSheetsCount,
+}: {
+  cutPlan: ClientCutPlan;
+  materialSheetsCount: number;
+}) {
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <Card className="shadow-xs">
         <CardHeader>
-          <CardDescription>Листов</CardDescription>
+          <CardDescription>Листов (заказ)</CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums">
+            {materialSheetsCount}
+          </CardTitle>
+        </CardHeader>
+      </Card>
+      <Card className="shadow-xs">
+        <CardHeader>
+          <CardDescription>В раскрое</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums">
             {cutPlan.totalSheetsCount}
           </CardTitle>
@@ -260,17 +299,9 @@ function CutPlanSummary({ cutPlan }: { cutPlan: ClientCutPlan }) {
       </Card>
       <Card className="shadow-xs">
         <CardHeader>
-          <CardDescription>Отход</CardDescription>
+          <CardDescription>Отход (раскрой)</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums">
             {Number(cutPlan.wastePercent ?? 0).toFixed(1)}%
-          </CardTitle>
-        </CardHeader>
-      </Card>
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardDescription>Операций реза</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums">
-            {cutPlan.totalSetupChangesCount}
           </CardTitle>
         </CardHeader>
       </Card>

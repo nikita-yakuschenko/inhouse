@@ -94,4 +94,81 @@ describe("packing density", () => {
     expect(result.metrics.sheetsCount).toBe(1);
     expect(result.sheets[0]?.placements).toHaveLength(4);
   });
+
+  it("в одном ряду ставит одинаковые высоты подряд (580 рядом, не через 550)", () => {
+    const result = runCuttingEngine({
+      ...base,
+      parts: [
+        {
+          id: "wide",
+          name: "Широкая",
+          code: "Ст-1-01-03",
+          quantity: 1,
+          widthMm: 2900,
+          heightMm: 650,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "a580",
+          name: "A",
+          code: "Ст-1-06-06",
+          quantity: 1,
+          widthMm: 785,
+          heightMm: 580,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "b550",
+          name: "B",
+          code: "Ст-1-03-05",
+          quantity: 1,
+          widthMm: 785,
+          heightMm: 550,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "c550",
+          name: "C",
+          code: "Ст-1-03-06",
+          quantity: 1,
+          widthMm: 635,
+          heightMm: 550,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "d580",
+          name: "D",
+          code: "Ст-1-06-07",
+          quantity: 1,
+          widthMm: 635,
+          heightMm: 580,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+      ],
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.metrics.sheetsCount).toBe(1);
+
+    const topRow = (result.sheets[0]?.placements ?? [])
+      .filter((part) => part.heightMm === 550 || part.heightMm === 580)
+      .sort((a, b) => a.xMm - b.xMm);
+
+    expect(topRow.map((part) => part.heightMm)).toEqual([580, 580, 550, 550]);
+  });
 });

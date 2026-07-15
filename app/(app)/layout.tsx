@@ -1,5 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar";
-import { getProjects } from "@/features/projects/queries";
+import { getRecentProjectsForNav } from "@/features/projects/queries";
 import { readAppRoleFromCookie, ROLE_COOKIE_NAME } from "@/lib/auth/roles";
 import { readSidebarOpenFromCookie, SIDEBAR_COOKIE_NAME } from "@/lib/sidebar-cookie";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -12,11 +12,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const projects = await getProjects();
-  const recentProjects = projects.slice(0, 5).map((project) => ({
-    id: project.id,
-    name: project.name,
-  }));
+  const recentProjects = await getRecentProjectsForNav(5);
 
   const cookieStore = await cookies();
   const defaultOpen = readSidebarOpenFromCookie(
