@@ -114,3 +114,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sonner инжектит font-family: system-ui/Segoe — перекрываем Inter */
+[data-sonner-toaster].toaster {
+  font-family: var(--font-sans);
+}
