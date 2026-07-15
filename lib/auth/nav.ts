@@ -33,7 +33,6 @@ const estimatorNav: SidebarNavConfig = {
       icon: IconBooks,
       items: [
         { title: "Материалы", url: "/catalog/materials" },
-        { title: "Профили станков", url: "/catalog/machines" },
       ],
     },
     {
@@ -41,8 +40,7 @@ const estimatorNav: SidebarNavConfig = {
       url: "/settings",
       icon: IconSettings,
       items: [
-        { title: "Организация", url: "/settings" },
-        { title: "Параметры раскроя", url: "/settings/cutting" },
+        { title: "Оборудование", url: "/settings/equipment" },
       ],
     },
   ],

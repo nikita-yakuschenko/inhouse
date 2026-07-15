@@ -29,7 +29,7 @@ export function buildEngineInput(params: {
     projectId: project.id,
     mode: project.mode,
     machine: {
-      kerfMm: machineProfile.defaultKerfMm,
+      kerfMm: Number(machineProfile.defaultKerfMm),
       minSafePartWidthMm: machineProfile.minSafePartWidthMm,
       minSafePartHeightMm: machineProfile.minSafePartHeightMm,
       supportsStopCut: machineProfile.supportsStopCut,

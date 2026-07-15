@@ -136,7 +136,48 @@ describe("buildGuillotineCuts", () => {
     expect(cuts?.[0]?.axis).toBe("vertical");
     expect(cuts?.[0]?.x1Mm).toBe(902);
     expect(cuts?.[1]?.axis).toBe("horizontal");
-    expect(cuts?.[1]?.y1Mm).toBe(1330);
+    expect(cuts?.[1]?.y1Mm).toBe(1332);
+  });
+
+  it("учитывает ширину пропила в размере бокового обрезка", () => {
+    const result = runCuttingEngine({
+      ...singlePartInput,
+      sheet: {
+        widthMm: 3000,
+        heightMm: 1250,
+        trimLeftMm: 0,
+        trimRightMm: 0,
+        trimTopMm: 0,
+        trimBottomMm: 0,
+      },
+      parts: [
+        {
+          id: "p1",
+          name: "Деталь",
+          quantity: 1,
+          widthMm: 2680,
+          heightMm: 1250,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+      ],
+    });
+
+    const sheet = result.sheets[0];
+    const placement = sheet?.placements[0];
+    const rightOffcut = sheet?.offcuts.find((offcut) => offcut.xMm > 0);
+
+    expect(placement?.widthMm).toBe(2680);
+    // 3000 − 2680 − kerf4 = 316, а не 320
+    expect(rightOffcut?.widthMm).toBe(316);
+    expect(rightOffcut?.xMm).toBe(2684);
+    expect(
+      (placement?.widthMm ?? 0) +
+        singlePartInput.machine.kerfMm +
+        (rightOffcut?.widthMm ?? 0),
+    ).toBe(3000);
   });
 
   it("строит поперечный рез для детали на всю ширину листа", () => {
@@ -163,7 +204,7 @@ describe("buildGuillotineCuts", () => {
 
     expect(cuts).toHaveLength(1);
     expect(cuts?.[0]?.axis).toBe("horizontal");
-    expect(cuts?.[0]?.y1Mm).toBe(2010);
+    expect(cuts?.[0]?.y1Mm).toBe(2012);
   });
 
   it("не добавляет подрезку кромок даже при ненулевом trim", () => {

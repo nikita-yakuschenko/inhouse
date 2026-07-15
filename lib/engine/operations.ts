@@ -65,7 +65,7 @@ function buildGuillotineCuts(
   const usableTop = usable.y + usable.height;
 
   // 1. Продольный рез — отделяет правый обрезок по всей высоте листа.
-  if (usedWidth > 0 && usedWidth < usable.width) {
+  if (usedWidth > 0 && usedWidth + kerf < usable.width) {
     const x = usable.x + usedWidth + kerf / 2;
     ops.push({
       sequenceNumber: seq++,
@@ -100,11 +100,11 @@ function buildGuillotineCuts(
     }
   }
 
-  // 3. Поперечные резы обрезка сверху — один рез на одинаковую высоту полос.
+  // 3. Поперечные резы обрезка сверху — центр пропила между деталью и обрезком.
   const topByY = new Map<number, { x1: number; x2: number }>();
   for (const strip of strips) {
     const top = getStripTop(strip, usable);
-    if (top >= usableTop) continue;
+    if (top + kerf >= usableTop) continue;
     const span = topByY.get(top) ?? { x1: strip.xMm, x2: strip.xMm + strip.widthMm };
     span.x1 = Math.min(span.x1, strip.xMm);
     span.x2 = Math.max(span.x2, strip.xMm + strip.widthMm);
@@ -113,14 +113,15 @@ function buildGuillotineCuts(
 
   const tops = [...topByY.entries()].sort(([a], [b]) => a - b);
   for (const [top, span] of tops) {
+    const cutY = top + kerf / 2;
     ops.push({
       sequenceNumber: seq++,
       operationType: "full_cut",
       axis: "horizontal",
       x1Mm: span.x1,
-      y1Mm: top,
+      y1Mm: cutY,
       x2Mm: span.x2,
-      y2Mm: top,
+      y2Mm: cutY,
       note: "Отделение обрезка вдоль подачи",
       riskLevel: "normal",
     });
@@ -196,18 +197,22 @@ export function buildOffcuts(
   const offcuts: EngineOffcut[] = [];
   const minW = input.settings.minUsefulOffcutWidthMm;
   const minH = input.settings.minUsefulOffcutHeightMm;
+  const kerf = input.machine.kerfMm;
   const strips = rebuildVerticalStrips(packed.placements);
+  const usableRight = usable.x + usable.width;
+  const usableTop = usable.y + usable.height;
 
   for (const strip of strips) {
     const maxPartHeight = getStripTop(strip, usable);
-    const freeHeight = usable.y + usable.height - maxPartHeight;
-    if (freeHeight > 0) {
+    // Пропил отделяет обрезок от детали — kerf уходит в опилки, не в обрезок.
+    const offcutY = maxPartHeight + kerf;
+    const heightMm = usableTop - offcutY;
+    if (heightMm > 0) {
       const widthMm = strip.widthMm;
-      const heightMm = freeHeight;
       const areaMm2 = widthMm * heightMm;
       offcuts.push({
         xMm: strip.xMm,
-        yMm: maxPartHeight,
+        yMm: offcutY,
         widthMm,
         heightMm,
         areaMm2,
@@ -220,11 +225,12 @@ export function buildOffcuts(
     return Math.max(max, strip.xMm + strip.widthMm);
   }, usable.x);
 
-  const rightWidth = usable.x + usable.width - usedRight;
+  const offcutX = usedRight + kerf;
+  const rightWidth = usableRight - offcutX;
   if (rightWidth > 0) {
     const areaMm2 = rightWidth * usable.height;
     offcuts.push({
-      xMm: usedRight,
+      xMm: offcutX,
       yMm: usable.y,
       widthMm: rightWidth,
       heightMm: usable.height,

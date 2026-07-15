@@ -156,7 +156,7 @@ model MachineProfile {
   maxSheetWidthMm                       Int      @map("max_sheet_width_mm")
   maxSheetHeightMm                      Int      @map("max_sheet_height_mm")
   maxSheetThicknessMm                   Int      @map("max_sheet_thickness_mm")
-  defaultKerfMm                         Int      @default(4) @map("default_kerf_mm")
+  defaultKerfMm                         Decimal  @default(4) @db.Decimal(8, 2) @map("default_kerf_mm")
   minSafePartWidthMm                    Int      @default(80) @map("min_safe_part_width_mm")
   minSafePartHeightMm                   Int      @default(80) @map("min_safe_part_height_mm")
   minUsefulOffcutWidthMm                Int      @default(300) @map("min_useful_offcut_width_mm")
@@ -346,7 +346,7 @@ model CutOperation {
   workpieceRef     String?       @map("workpiece_ref")
   targetPartId     String?       @map("target_part_id")
   setupValueMm     Int?          @map("setup_value_mm")
-  kerfMm           Int?          @map("kerf_mm")
+  kerfMm           Decimal?      @db.Decimal(8, 2) @map("kerf_mm")
   note             String?
   riskLevel        RiskLevel     @default(normal) @map("risk_level")
   createdAt        DateTime      @default(now()) @map("created_at")
