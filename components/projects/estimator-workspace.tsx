@@ -5,9 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { CalculateProjectButton } from "@/components/cut-plan/calculate-project-button";
 import { ExportCutPlanPdfButton } from "@/components/cut-plan/export-cut-plan-pdf-button";
-import { OperationsList } from "@/components/cut-plan/operations-list";
 import { SheetTabsPanel } from "@/components/cut-plan/sheet-tabs-panel";
 import { EstimatorPartsSection } from "@/components/projects/estimator-parts-section";
+import { MaterialsSpecification } from "@/components/projects/materials-specification";
 import { PanelSelector } from "@/components/projects/panel-selector";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,11 +20,18 @@ import {
 } from "@/lib/cut-plan/panel-workspace-state";
 import { getSheetIndicesForPart } from "@/lib/cut-plan/sheet-part-groups";
 
-const ESTIMATOR_TABS = ["parts", "cut", "ops"] as const;
+const ESTIMATOR_TABS = ["parts", "cut", "spec"] as const;
 type EstimatorTab = (typeof ESTIMATOR_TABS)[number];
 
 function isEstimatorTab(value: string | null | undefined): value is EstimatorTab {
   return ESTIMATOR_TABS.includes(value as EstimatorTab);
+}
+
+/** Старые ссылки ?tab=ops → Спецификация */
+function resolveEstimatorTab(value: string | null | undefined): EstimatorTab | null {
+  if (value === "ops" || value === "operations") return "spec";
+  if (isEstimatorTab(value)) return value;
+  return null;
 }
 
 export function EstimatorWorkspace({
@@ -87,11 +94,8 @@ function EstimatorWorkspaceInner({
   const cutPlan = activePanel.cutPlans[0] ?? null;
   const cutPlanId = cutPlan?.id ?? null;
 
-  const activeTab: EstimatorTab = isEstimatorTab(tabFromUrl)
-    ? tabFromUrl
-    : cutPlan
-      ? "cut"
-      : "parts";
+  const activeTab: EstimatorTab =
+    resolveEstimatorTab(tabFromUrl) ?? (cutPlan ? "cut" : "parts");
 
   const { sheetIdx, groupedPartId } = useMemo(() => {
     if (!cutPlan?.sheets.length) {
@@ -209,7 +213,7 @@ function EstimatorWorkspaceInner({
           <TabsList>
             <TabsTrigger value="parts">Детали</TabsTrigger>
             <TabsTrigger value="cut">Карта раскроя</TabsTrigger>
-            <TabsTrigger value="ops">Операции</TabsTrigger>
+            <TabsTrigger value="spec">Спецификация</TabsTrigger>
           </TabsList>
 
           <TabsContent value="parts" className="mt-4 min-h-0 flex-1">
@@ -226,7 +230,7 @@ function EstimatorWorkspaceInner({
                 Выполните расчёт — карта раскроя появится на этой вкладке
               </div>
             ) : (
-              <div className="flex h-[min(48rem,calc(100vh-16rem))] min-h-[24rem] flex-col gap-4">
+              <div className="flex h-[min(48rem,calc(100vh-16rem))] min-h-96 flex-col gap-4">
                 <CutPlanSummary cutPlan={cutPlan} />
                 <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
                   <SheetTabsPanel
@@ -241,16 +245,12 @@ function EstimatorWorkspaceInner({
             )}
           </TabsContent>
 
-          <TabsContent value="ops" className="mt-4 min-h-0 flex-1">
-            {!activeSheet ? (
-              <div className="flex h-48 items-center justify-center rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-                Операции появятся после расчёта раскроя
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border bg-card">
-                <OperationsList operations={activeSheet.operations} />
-              </div>
-            )}
+          <TabsContent value="spec" className="mt-4 min-h-0 flex-1">
+            <MaterialsSpecification
+              sheetContext={sheetContext}
+              parts={activePanel.parts}
+              cutPlan={cutPlan}
+            />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,5 +1,6 @@
 import { createPartAction, deletePartAction } from "@/features/parts/actions";
 import type { ClientPart } from "@/features/projects/serialize-panels";
+import { ImportPartsButton } from "@/components/projects/import-parts-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,8 +92,9 @@ export function EstimatorPartsSection({
           <Label htmlFor="part-qty">Кол-во</Label>
           <Input id="part-qty" name="quantity" type="number" required min={1} defaultValue={1} />
         </div>
-        <div className="flex items-end sm:col-span-2 lg:col-span-6">
+        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
           <Button type="submit">Добавить деталь</Button>
+          <ImportPartsButton projectId={projectId} panelId={panelId} />
         </div>
       </form>
     </div>

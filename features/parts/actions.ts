@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
-import { entityIdSchema, generateEntityId } from "@/lib/id";
+import { entityIdSchema, generateEntityId, generateEntityIds } from "@/lib/id";
+import { parseSpecificationXlsx } from "@/lib/parts/parse-specification-xlsx";
 
 const partSchema = z.object({
   projectId: entityIdSchema,
@@ -59,6 +60,68 @@ export async function createPartAction(formData: FormData) {
   });
 
   revalidatePath(`/projects/${parsed.data.projectId}`);
+}
+
+const importPartsSchema = z.object({
+  projectId: entityIdSchema,
+  panelId: entityIdSchema,
+});
+
+export async function importPartsFromXlsxAction(formData: FormData) {
+  const parsed = importPartsSchema.safeParse({
+    projectId: formData.get("projectId"),
+    panelId: formData.get("panelId"),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: parsed.error.issues[0]?.message ?? "Некорректные данные импорта",
+    };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false as const, error: "Выберите файл Excel (.xlsx, .xls)" };
+  }
+
+  try {
+    const project = await prisma.project.findUniqueOrThrow({
+      where: { id: parsed.data.projectId },
+    });
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const importedParts = parseSpecificationXlsx(buffer, {
+      namePrefix: project.name,
+    });
+
+    const ids = generateEntityIds(importedParts.length);
+
+    await prisma.part.createMany({
+      data: importedParts.map((part, index) => ({
+        id: ids[index]!,
+        projectId: parsed.data.projectId,
+        panelId: parsed.data.panelId,
+        materialId: project.materialId,
+        sheetFormatId: project.sheetFormatId,
+        name: part.name,
+        code: part.code,
+        widthMm: part.widthMm,
+        heightMm: part.heightMm,
+        quantity: part.quantity,
+        allowRotation: true,
+        shapeType: "rectangle",
+      })),
+    });
+
+    revalidatePath(`/projects/${parsed.data.projectId}`);
+    return { ok: true as const, importedCount: importedParts.length };
+  } catch (error) {
+    console.error("importPartsFromXlsxAction failed", error);
+    const message =
+      error instanceof Error ? error.message : "Не удалось загрузить спецификацию";
+    return { ok: false as const, error: message };
+  }
 }
 
 export async function deletePartAction(formData: FormData) {

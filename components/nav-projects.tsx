@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { IconDots } from "@tabler/icons-react";
 
 import { ProjectIcon } from "@/components/projects/project-icon";
 import {
@@ -16,7 +15,6 @@ export function NavProjects({
   projects,
   projectHref,
   recentLabel = "Недавние проекты",
-  listAllLabel = "Все проекты",
 }: {
   projects: {
     id: string;
@@ -24,7 +22,6 @@ export function NavProjects({
   }[];
   projectHref: (projectId: string) => string;
   recentLabel?: string;
-  listAllLabel?: string;
 }) {
   if (projects.length === 0) {
     return null;
@@ -44,14 +41,6 @@ export function NavProjects({
             </SidebarMenuButton>
           </SidebarMenuItem>
         ))}
-        <SidebarMenuItem>
-          <SidebarMenuButton asChild className="text-sidebar-foreground/70">
-            <Link href="/">
-              <IconDots className="text-sidebar-foreground/70" />
-              <span>{listAllLabel}</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
   );

@@ -43,7 +43,6 @@ export function AppSidebar({
             projects={recentProjects}
             projectHref={nav.projectHref}
             recentLabel={nav.recentLabel}
-            listAllLabel={nav.listAllLabel}
           />
         ) : null}
       </SidebarContent>
