@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -37,7 +37,6 @@ const fieldClassName = cn(
   "disabled:cursor-not-allowed disabled:opacity-50",
 );
 
-/** Тонкий шеврон с отступом от правого края (вместо системного). */
 const selectChevron =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")";
 
@@ -60,6 +59,7 @@ export function CreateProjectForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [kind, setKind] = useState<"sheet" | "bar">("sheet");
 
   const catalogReady = sheetFormats.length > 0 && machineProfiles.length > 0;
 
@@ -70,23 +70,41 @@ export function CreateProjectForm({
     machineProfiles[0]?.id ??
     "";
 
-  if (!catalogReady) {
+  if (kind === "sheet" && !catalogReady) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
-        <h3 className="text-base font-semibold">Справочники не загружены</h3>
-        <p className="mt-2">
-          Добавьте материал в «Справочники → Материалы» и убедитесь, что есть профиль
-          станка.
-        </p>
+      <div className="space-y-4">
+        <div className="grid gap-2">
+          <Label htmlFor="kind-select">Вид раскроя</Label>
+          <select
+            id="kind-select"
+            className={selectClassName}
+            style={{ backgroundImage: selectChevron }}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as "sheet" | "bar")}
+          >
+            <option value="sheet">Плиты (листовой материал)</option>
+            <option value="bar">Погонаж (заготовки и отрезки)</option>
+          </select>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
+          <h3 className="text-base font-semibold">Справочники не загружены</h3>
+          <p className="mt-2">
+            Для плитного раскроя добавьте материал в «Справочники → Материалы» и
+            профиль станка. Либо выберите погонаж.
+          </p>
+        </div>
       </div>
     );
   }
 
   function handleSubmit(formData: FormData) {
-    const sheetFormatId = String(formData.get("sheetFormatId") ?? "");
-    const sheet = sheetFormats.find((item) => item.id === sheetFormatId);
-    if (sheet) {
-      formData.set("materialId", sheet.materialId);
+    formData.set("kind", kind);
+    if (kind === "sheet") {
+      const sheetFormatId = String(formData.get("sheetFormatId") ?? "");
+      const sheet = sheetFormats.find((item) => item.id === sheetFormatId);
+      if (sheet) {
+        formData.set("materialId", sheet.materialId);
+      }
     }
 
     startTransition(async () => {
@@ -106,12 +124,30 @@ export function CreateProjectForm({
   return (
     <form action={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label htmlFor="name">Заводской номер домокомплекта</Label>
+        <Label htmlFor="kind">Вид раскроя</Label>
+        <select
+          id="kind"
+          name="kind"
+          className={selectClassName}
+          style={{ backgroundImage: selectChevron }}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as "sheet" | "bar")}
+          disabled={pending}
+        >
+          <option value="sheet">Плиты (листовой материал)</option>
+          <option value="bar">Погонаж (заготовки и отрезки)</option>
+        </select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="name">
+          {kind === "bar" ? "Название расчёта" : "Заводской номер домокомплекта"}
+        </Label>
         <Input
           id="name"
           name="name"
           required
-          placeholder="Например, ДК-2026-014"
+          placeholder={kind === "bar" ? "Например, Погонаж 356" : "Например, ДК-2026-014"}
           disabled={pending}
         />
       </div>
@@ -127,63 +163,68 @@ export function CreateProjectForm({
         />
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="technology">Технология</Label>
-        <select
-          id="technology"
-          name="technology"
-          required
-          defaultValue=""
-          className={selectClassName}
-          style={{ backgroundImage: selectChevron }}
-          disabled={pending}
-        >
-          <option value="" disabled>
-            Выберите технологию
-          </option>
-          <option value="pkd">ПКД (панельно-каркасная)</option>
-          <option value="md">МД (модульная)</option>
-        </select>
-      </div>
+      {kind === "sheet" && (
+        <>
+          <div className="grid gap-2">
+            <Label htmlFor="technology">Технология</Label>
+            <select
+              id="technology"
+              name="technology"
+              required
+              defaultValue=""
+              className={selectClassName}
+              style={{ backgroundImage: selectChevron }}
+              disabled={pending}
+            >
+              <option value="" disabled>
+                Выберите технологию
+              </option>
+              <option value="pkd">ПКД (панельно-каркасная)</option>
+              <option value="md">МД (модульная)</option>
+            </select>
+          </div>
 
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="sheetFormatId">Материал</Label>
-          <select
-            id="sheetFormatId"
-            name="sheetFormatId"
-            required
-            defaultValue={defaultSheet}
-            className={selectClassName}
-            style={{ backgroundImage: selectChevron }}
-            disabled={pending}
-          >
-            {sheetFormats.map((sheet) => (
-              <option key={sheet.id} value={sheet.id}>
-                {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×{Number(sheet.thicknessMm)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="machineProfileId">Станок</Label>
-          <select
-            id="machineProfileId"
-            name="machineProfileId"
-            required
-            defaultValue={defaultMachine}
-            className={selectClassName}
-            style={{ backgroundImage: selectChevron }}
-            disabled={pending}
-          >
-            {machineProfiles.map((machine) => (
-              <option key={machine.id} value={machine.id}>
-                {machine.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="sheetFormatId">Материал</Label>
+              <select
+                id="sheetFormatId"
+                name="sheetFormatId"
+                required
+                defaultValue={defaultSheet}
+                className={selectClassName}
+                style={{ backgroundImage: selectChevron }}
+                disabled={pending}
+              >
+                {sheetFormats.map((sheet) => (
+                  <option key={sheet.id} value={sheet.id}>
+                    {sheet.material.name} · {sheet.widthMm}×{sheet.heightMm}×
+                    {Number(sheet.thicknessMm)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="machineProfileId">Станок</Label>
+              <select
+                id="machineProfileId"
+                name="machineProfileId"
+                required
+                defaultValue={defaultMachine}
+                className={selectClassName}
+                style={{ backgroundImage: selectChevron }}
+                disabled={pending}
+              >
+                {machineProfiles.map((machine) => (
+                  <option key={machine.id} value={machine.id}>
+                    {machine.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="grid gap-2">
         <Label htmlFor="description">Описание</Label>

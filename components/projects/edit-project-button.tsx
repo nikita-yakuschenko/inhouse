@@ -74,7 +74,8 @@ export function EditProjectButton({
       toast.error("Укажите номер договора");
       return;
     }
-    if (tech !== "pkd" && tech !== "md") {
+    const needsTechnology = technology === "pkd" || technology === "md";
+    if (needsTechnology && tech !== "pkd" && tech !== "md") {
       toast.error("Выберите технологию");
       return;
     }
@@ -82,7 +83,7 @@ export function EditProjectButton({
     if (
       nextName === factoryNumber &&
       nextContract === (contractNumber ?? "") &&
-      tech === technology
+      tech === (technology ?? "")
     ) {
       setOpen(false);
       return;
@@ -93,7 +94,7 @@ export function EditProjectButton({
         projectId,
         name: nextName,
         contractNumber: nextContract,
-        technology: tech,
+        technology: needsTechnology ? tech : null,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -160,34 +161,41 @@ export function EditProjectButton({
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor={`technology-${projectId}`}>Технология</Label>
-            <select
-              id={`technology-${projectId}`}
-              value={tech}
-              onChange={(event) =>
-                setTech(event.target.value as ProjectTechnologyValue | "")
-              }
-              className={selectClassName}
-              style={{ backgroundImage: selectChevron }}
-              disabled={pending}
-            >
-              <option value="" disabled>
-                Выберите технологию
-              </option>
-              {PROJECT_TECHNOLOGY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+          {(technology === "pkd" || technology === "md") && (
+            <div className="grid gap-2">
+              <Label htmlFor={`technology-${projectId}`}>Технология</Label>
+              <select
+                id={`technology-${projectId}`}
+                value={tech}
+                onChange={(event) =>
+                  setTech(event.target.value as ProjectTechnologyValue | "")
+                }
+                className={selectClassName}
+                style={{ backgroundImage: selectChevron }}
+                disabled={pending}
+              >
+                <option value="" disabled>
+                  Выберите технологию
                 </option>
-              ))}
-            </select>
-          </div>
+                {PROJECT_TECHNOLOGY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Отмена</AlertDialogCancel>
           <AlertDialogAction
-            disabled={pending || !name.trim() || !contract.trim() || !tech}
+            disabled={
+              pending ||
+              !name.trim() ||
+              !contract.trim() ||
+              ((technology === "pkd" || technology === "md") && !tech)
+            }
             onClick={(event) => {
               event.preventDefault();
               handleSave();

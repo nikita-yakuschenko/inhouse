@@ -28,6 +28,12 @@ enum ProjectTechnology {
   md
 }
 
+/** Вид расчёта: плитный (листы) или погонаж (заготовки/отрезки). */
+enum ProjectKind {
+  sheet
+  bar
+}
+
 enum CutPlanStatus {
   calculating
   calculated
@@ -195,11 +201,16 @@ model Project {
   customerName     String?            @map("customer_name")
   contractNumber   String?            @map("contract_number")
   technology       ProjectTechnology?
+  kind             ProjectKind        @default(sheet)
   status           ProjectStatus      @default(draft)
   mode             ProjectMode        @default(production)
   materialId       String?            @map("material_id")
   sheetFormatId    String?            @map("sheet_format_id")
   machineProfileId String?            @map("machine_profile_id")
+  /** Пропил для погонажа, мм */
+  barKerfMm        Decimal            @default(0) @db.Decimal(8, 2) @map("bar_kerf_mm")
+  /** Вычитать дельту фасок из длины заготовки */
+  barApplyMiter    Boolean            @default(true) @map("bar_apply_miter")
   createdByUserId  String?            @map("created_by_user_id")
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
@@ -212,8 +223,72 @@ model Project {
   panels         Panel[]
   parts          Part[]
   cutPlans       CutPlan[]
+  barSegments    BarSegment[]
+  barStocks      BarStock[]
+  barCutPlans    BarCutPlan[]
 
   @@map("projects")
+}
+
+/** Отрезок (деталь) в расчёте погонажа. */
+model BarSegment {
+  id          String   @id @db.Char(8)
+  projectId   String   @map("project_id")
+  label       String   @default("")
+  outerMm     Int      @map("outer_mm")
+  innerMm     Int?     @map("inner_mm")
+  quantity    Int      @default(1)
+  sortOrder   Int      @default(0) @map("sort_order")
+  colorIndex  Int      @default(0) @map("color_index")
+  material    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("bar_segments")
+}
+
+/** Заготовка на складе для погонажа. */
+model BarStock {
+  id         String   @id @db.Char(8)
+  projectId  String   @map("project_id")
+  lengthMm   Int      @map("length_mm")
+  /** null = без лимита (∞) */
+  quantity   Int?
+  name       String?
+  priority   Int      @default(0)
+  material   String?
+  cost       Decimal? @db.Decimal(12, 2)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("bar_stocks")
+}
+
+/** Сохранённый результат раскроя погонажа (JSON карты заготовок). */
+model BarCutPlan {
+  id                 String   @id @db.Char(8)
+  projectId          String   @map("project_id")
+  algorithmVersion   String   @map("algorithm_version")
+  method             String
+  kerfMm             Decimal  @db.Decimal(8, 2) @map("kerf_mm")
+  totalBarsCount     Int      @default(0) @map("total_bars_count")
+  totalStockMm       BigInt   @default(0) @map("total_stock_mm")
+  totalUsefulMm      BigInt   @default(0) @map("total_useful_mm")
+  wastePercent       Decimal? @map("waste_percent")
+  totalCuts          Int      @default(0) @map("total_cuts")
+  multiStock         Boolean  @default(false) @map("multi_stock")
+  resultJson         Json     @map("result_json")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("bar_cut_plans")
 }
 
 model Panel {

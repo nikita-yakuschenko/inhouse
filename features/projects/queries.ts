@@ -44,6 +44,12 @@ export async function getProjects() {
           },
         },
       },
+      barSegments: { select: { id: true, quantity: true } },
+      barCutPlans: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { id: true, totalBarsCount: true, wastePercent: true },
+      },
     },
   });
 }
@@ -60,6 +66,12 @@ const projectDetailInclude = {
       cutPlans: panelCutPlanInclude,
     },
   },
+  barSegments: { orderBy: { sortOrder: "asc" as const } },
+  barStocks: { orderBy: { sortOrder: "asc" as const } },
+  barCutPlans: {
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+  },
 };
 
 export async function getProjectById(projectId: string) {
@@ -72,7 +84,7 @@ export async function getProjectById(projectId: string) {
     return null;
   }
 
-  if (project.panels.length === 0) {
+  if (project.kind === "sheet" && project.panels.length === 0) {
     await ensurePanelsForProject(projectId);
     return prisma.project.findUnique({
       where: { id: projectId },
@@ -134,8 +146,11 @@ export async function getCatalogDefaults() {
 export async function getOperatorAssignments() {
   const projects = await getProjects();
 
-  return projects.flatMap((project) =>
-    project.panels
+  return projects.flatMap((project) => {
+    if (project.kind === "bar") {
+      return [];
+    }
+    return project.panels
       .filter((panel) => panel.cutPlans.length > 0)
       .map((panel) => {
         const cutPlan = panel.cutPlans[0]!;
@@ -152,8 +167,8 @@ export async function getOperatorAssignments() {
           partsCount,
           partsQuantity,
         };
-      }),
-  );
+      });
+  });
 }
 
 export async function getLatestCutPlanForPanel(panelId: string) {

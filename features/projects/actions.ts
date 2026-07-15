@@ -14,24 +14,27 @@ const technologySchema = z.enum(PROJECT_TECHNOLOGY_VALUES, {
 const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Укажите заводской номер домокомплекта"),
   contractNumber: z.string().trim().min(1, "Укажите номер договора"),
-  technology: technologySchema,
+  kind: z.enum(["sheet", "bar"]).default("sheet"),
+  technology: technologySchema.optional(),
   description: z.string().optional(),
   customerName: z.string().optional(),
-  materialId: entityIdSchema,
-  sheetFormatId: entityIdSchema,
-  machineProfileId: entityIdSchema,
+  materialId: entityIdSchema.optional(),
+  sheetFormatId: entityIdSchema.optional(),
+  machineProfileId: entityIdSchema.optional(),
 });
 
 export async function createProjectAction(formData: FormData) {
+  const kindRaw = String(formData.get("kind") ?? "sheet");
   const parsed = createProjectSchema.safeParse({
     name: formData.get("name"),
     contractNumber: formData.get("contractNumber"),
-    technology: formData.get("technology"),
+    kind: kindRaw === "bar" ? "bar" : "sheet",
+    technology: formData.get("technology") || undefined,
     description: formData.get("description") || undefined,
     customerName: formData.get("customerName") || undefined,
-    materialId: formData.get("materialId"),
-    sheetFormatId: formData.get("sheetFormatId"),
-    machineProfileId: formData.get("machineProfileId"),
+    materialId: formData.get("materialId") || undefined,
+    sheetFormatId: formData.get("sheetFormatId") || undefined,
+    machineProfileId: formData.get("machineProfileId") || undefined,
   });
 
   if (!parsed.success) {
@@ -41,22 +44,75 @@ export async function createProjectAction(formData: FormData) {
     };
   }
 
+  const kind = parsed.data.kind;
+
+  if (kind === "sheet") {
+    if (!parsed.data.technology) {
+      return { ok: false as const, error: "Выберите технологию" };
+    }
+    if (
+      !parsed.data.materialId ||
+      !parsed.data.sheetFormatId ||
+      !parsed.data.machineProfileId
+    ) {
+      return {
+        ok: false as const,
+        error: "Выберите материал, формат листа и станок",
+      };
+    }
+  }
+
   try {
     const projectId = generateEntityId();
-    const panelId = generateEntityId();
 
+    if (kind === "bar") {
+      const stockId = generateEntityId();
+      const project = await prisma.project.create({
+        data: {
+          id: projectId,
+          organizationId: SEED_IDS.organization,
+          name: parsed.data.name,
+          contractNumber: parsed.data.contractNumber,
+          description: parsed.data.description,
+          customerName: parsed.data.customerName,
+          kind: "bar",
+          status: "draft",
+          mode: "production",
+          barKerfMm: 0,
+          barApplyMiter: true,
+          barStocks: {
+            create: {
+              id: stockId,
+              lengthMm: 6000,
+              quantity: null,
+              sortOrder: 0,
+            },
+          },
+        },
+      });
+
+      revalidatePath("/");
+      return {
+        ok: true as const,
+        projectId: project.id,
+        name: project.name,
+      };
+    }
+
+    const panelId = generateEntityId();
     const project = await prisma.project.create({
       data: {
         id: projectId,
         organizationId: SEED_IDS.organization,
         name: parsed.data.name,
         contractNumber: parsed.data.contractNumber,
-        technology: parsed.data.technology,
+        technology: parsed.data.technology!,
+        kind: "sheet",
         description: parsed.data.description,
         customerName: parsed.data.customerName,
-        materialId: parsed.data.materialId,
-        sheetFormatId: parsed.data.sheetFormatId,
-        machineProfileId: parsed.data.machineProfileId,
+        materialId: parsed.data.materialId!,
+        sheetFormatId: parsed.data.sheetFormatId!,
+        machineProfileId: parsed.data.machineProfileId!,
         status: "draft",
         mode: "production",
         panels: {
@@ -86,21 +142,21 @@ const updateProjectSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Укажите заводской номер домокомплекта")
-    .max(120, "Слишком длинный заводской номер"),
+    .min(1, "Укажите название или заводской номер")
+    .max(120, "Слишком длинное название"),
   contractNumber: z
     .string()
     .trim()
     .min(1, "Укажите номер договора")
     .max(120, "Слишком длинный номер договора"),
-  technology: technologySchema,
+  technology: technologySchema.optional().nullable(),
 });
 
 export async function updateProjectAction(input: {
   projectId: string;
   name: string;
   contractNumber: string;
-  technology: string;
+  technology?: string | null;
 }) {
   const parsed = updateProjectSchema.safeParse(input);
 
@@ -112,12 +168,25 @@ export async function updateProjectAction(input: {
   }
 
   try {
+    const existing = await prisma.project.findUnique({
+      where: { id: parsed.data.projectId },
+      select: { kind: true },
+    });
+    if (!existing) {
+      return { ok: false as const, error: "Проект не найден" };
+    }
+    if (existing.kind === "sheet" && !parsed.data.technology) {
+      return { ok: false as const, error: "Выберите технологию" };
+    }
+
     const project = await prisma.project.update({
       where: { id: parsed.data.projectId },
       data: {
         name: parsed.data.name,
         contractNumber: parsed.data.contractNumber,
-        technology: parsed.data.technology,
+        ...(existing.kind === "sheet" && parsed.data.technology
+          ? { technology: parsed.data.technology }
+          : {}),
       },
       select: {
         id: true,

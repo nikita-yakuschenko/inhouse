@@ -41,8 +41,7 @@ export function NewCalculationSheet({
         <SheetHeader>
           <SheetTitle>{labels.newItem}</SheetTitle>
           <SheetDescription>
-            Укажите проект компании, материал, формат листа и профиль станка для расчёта
-            раскроя.
+            Выберите плитный раскрой или погонаж, затем укажите параметры проекта.
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-6">

@@ -89,6 +89,7 @@ export function EstimatorCalculationsTable({
           <SortableHeader column={column}>Зав. № домокомплекта</SortableHeader>
         ),
         cell: ({ row }) => {
+          const kindLabel = row.original.kind === "bar" ? "Погонаж" : "Плиты";
           const technologyLabel =
             row.original.technology === "pkd"
               ? "ПКД"
@@ -101,7 +102,12 @@ export function EstimatorCalculationsTable({
 
           return (
             <div className="min-w-48">
-              <p className="font-medium">{title}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">{title}</p>
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {kindLabel}
+                </span>
+              </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {row.original.contractNumber
                   ? `договор ${row.original.contractNumber}`
@@ -113,7 +119,9 @@ export function EstimatorCalculationsTable({
       },
       {
         accessorKey: "panelsCount",
-        header: ({ column }) => <SortableHeader column={column}>Панели</SortableHeader>,
+        header: ({ column }) => (
+          <SortableHeader column={column}>Панели / заг.</SortableHeader>
+        ),
         cell: ({ row }) => <span className="tabular-nums">{row.original.panelsCount}</span>,
       },
       {

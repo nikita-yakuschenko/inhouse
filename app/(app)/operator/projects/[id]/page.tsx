@@ -32,6 +32,10 @@ export default async function OperatorProjectPage({
     notFound();
   }
 
+  if (project.kind === "bar") {
+    notFound();
+  }
+
   return (
     <AppPage
       fill
