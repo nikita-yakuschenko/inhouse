@@ -8,27 +8,51 @@ import type {
   UsableArea,
 } from "./types";
 
-function getWorkingStripHeight(packed: PackedSheet, usable: UsableArea): number {
-  if (packed.strips.length === 0) {
-    return usable.y;
+function getStripTop(strip: { parts: { yMm: number; heightMm: number }[] }, usable: UsableArea): number {
+  if (strip.parts.length === 0) return usable.y;
+  return strip.parts.reduce(
+    (top, part) => Math.max(top, part.yMm + part.heightMm),
+    usable.y,
+  );
+}
+
+/** Восстанавливаем вертикальные полосы из размещений — независим от оси packing. */
+function rebuildVerticalStrips(placements: PlacedPart[]): PackedSheet["strips"] {
+  const byX = new Map<number, PlacedPart[]>();
+  for (const part of placements) {
+    const list = byX.get(part.xMm) ?? [];
+    list.push(part);
+    byX.set(part.xMm, list);
   }
 
-  return packed.strips.reduce((maxHeight, strip) => {
-    const stripTop = strip.parts.reduce(
-      (top, part) => Math.max(top, part.yMm + part.heightMm),
-      usable.y,
-    );
-    return Math.max(maxHeight, stripTop);
-  }, usable.y);
+  return [...byX.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([xMm, parts]) => {
+      const ordered = [...parts].sort((a, b) => a.yMm - b.yMm);
+      const widthMm = ordered.reduce((max, part) => Math.max(max, part.widthMm), 0);
+      const last = ordered[ordered.length - 1];
+      const heightUsedMm = last ? last.yMm + last.heightMm - (ordered[0]?.yMm ?? 0) : 0;
+      return {
+        xMm,
+        widthMm,
+        heightUsedMm,
+        parts: ordered,
+      };
+    });
 }
 
-function getWorkingStripDepth(packed: PackedSheet): number {
-  return packed.strips.reduce((maxDepth, strip) => Math.max(maxDepth, strip.widthMm), 0);
+/** Ширина занятой рабочей зоны (сумма полос), а не max(width полосы). */
+function getUsedWidth(strips: PackedSheet["strips"], usable: UsableArea): number {
+  if (strips.length === 0) return 0;
+  return strips.reduce(
+    (max, strip) => Math.max(max, strip.xMm + strip.widthMm - usable.x),
+    0,
+  );
 }
 
-/** Гильотинная последовательность за одну установку: сначала поперёк всего листа, затем в нижней полосе. */
+/** Гильотинная последовательность: отделение остатка, поперечные резы, продольные между полосами. */
 function buildGuillotineCuts(
-  packed: PackedSheet,
+  placements: PlacedPart[],
   input: EngineInput,
   usable: UsableArea,
   startSequence: number,
@@ -36,12 +60,13 @@ function buildGuillotineCuts(
   const ops: EngineOperation[] = [];
   let seq = startSequence;
   const kerf = input.machine.kerfMm;
-  const workingHeight = getWorkingStripHeight(packed, usable);
-  const workingDepth = getWorkingStripDepth(packed);
+  const strips = rebuildVerticalStrips(placements);
+  const usedWidth = getUsedWidth(strips, usable);
+  const usableTop = usable.y + usable.height;
 
-  // 1. Продольный рез по всей длине — отделяет нижнюю полосу (на схеме оператора это горизонтальная линия).
-  if (workingDepth < usable.width) {
-    const x = usable.x + workingDepth + kerf / 2;
+  // 1. Продольный рез — отделяет правый обрезок по всей высоте листа.
+  if (usedWidth > 0 && usedWidth < usable.width) {
+    const x = usable.x + usedWidth + kerf / 2;
     ops.push({
       sequenceNumber: seq++,
       operationType: "full_cut",
@@ -49,14 +74,14 @@ function buildGuillotineCuts(
       x1Mm: x,
       y1Mm: usable.y,
       x2Mm: x,
-      y2Mm: usable.y + usable.height,
-      note: "Отделение нижней полосы от верхнего обрезка",
+      y2Mm: usableTop,
+      note: "Отделение бокового обрезка",
       riskLevel: "normal",
     });
   }
 
-  // 2. Поперечные резы внутри нижней полосы (между деталями и вдоль подачи).
-  for (const strip of packed.strips) {
+  // 2. Поперечные резы между деталями внутри полосы.
+  for (const strip of strips) {
     for (let i = 0; i < strip.parts.length - 1; i += 1) {
       const part = strip.parts[i];
       const cutY = part.yMm + part.heightMm + kerf / 2;
@@ -73,25 +98,44 @@ function buildGuillotineCuts(
         riskLevel: "normal",
       });
     }
-
-    if (workingHeight < usable.y + usable.height) {
-      ops.push({
-        sequenceNumber: seq++,
-        operationType: "full_cut",
-        axis: "horizontal",
-        x1Mm: strip.xMm,
-        y1Mm: workingHeight,
-        x2Mm: strip.xMm + strip.widthMm,
-        y2Mm: workingHeight,
-        note: "Отделение обрезка вдоль подачи",
-        riskLevel: "normal",
-      });
-    }
   }
 
-  // 3. Продольные резы между полосами — только в нижней зоне.
-  for (let i = 1; i < packed.strips.length; i += 1) {
-    const x = packed.strips[i].xMm - kerf / 2;
+  // 3. Поперечные резы обрезка сверху — один рез на одинаковую высоту полос.
+  const topByY = new Map<number, { x1: number; x2: number }>();
+  for (const strip of strips) {
+    const top = getStripTop(strip, usable);
+    if (top >= usableTop) continue;
+    const span = topByY.get(top) ?? { x1: strip.xMm, x2: strip.xMm + strip.widthMm };
+    span.x1 = Math.min(span.x1, strip.xMm);
+    span.x2 = Math.max(span.x2, strip.xMm + strip.widthMm);
+    topByY.set(top, span);
+  }
+
+  const tops = [...topByY.entries()].sort(([a], [b]) => a - b);
+  for (const [top, span] of tops) {
+    ops.push({
+      sequenceNumber: seq++,
+      operationType: "full_cut",
+      axis: "horizontal",
+      x1Mm: span.x1,
+      y1Mm: top,
+      x2Mm: span.x2,
+      y2Mm: top,
+      note: "Отделение обрезка вдоль подачи",
+      riskLevel: "normal",
+    });
+  }
+
+  // 4. Продольные резы между полосами — в зоне деталей.
+  const workingHeight = strips.reduce(
+    (max, strip) => Math.max(max, getStripTop(strip, usable)),
+    usable.y,
+  );
+
+  for (let i = 1; i < strips.length; i += 1) {
+    const gapStart = strips[i - 1].xMm + strips[i - 1].widthMm;
+    const gapEnd = strips[i].xMm;
+    const x = (gapStart + gapEnd) / 2;
     ops.push({
       sequenceNumber: seq++,
       operationType: "full_cut",
@@ -127,10 +171,8 @@ export function buildSheetOperations(
   input: EngineInput,
   usable: UsableArea,
 ): EngineOperation[] {
-  // Заводской лист — без подрезки кромок; trim_* только сужает usable area при необходимости
-  const cutOps = buildGuillotineCuts(packed, input, usable, 1);
+  const cutOps = buildGuillotineCuts(packed.placements, input, usable, 1);
   const labelOps = buildLabelOperations(packed.placements, cutOps.length + 1);
-
   return [...cutOps, ...labelOps];
 }
 
@@ -154,13 +196,10 @@ export function buildOffcuts(
   const offcuts: EngineOffcut[] = [];
   const minW = input.settings.minUsefulOffcutWidthMm;
   const minH = input.settings.minUsefulOffcutHeightMm;
+  const strips = rebuildVerticalStrips(packed.placements);
 
-  // Simple free-rectangle scan along vertical strips gaps
-  for (const strip of packed.strips) {
-    const maxPartHeight = strip.parts.reduce(
-      (max, part) => Math.max(max, part.yMm + part.heightMm),
-      usable.y,
-    );
+  for (const strip of strips) {
+    const maxPartHeight = getStripTop(strip, usable);
     const freeHeight = usable.y + usable.height - maxPartHeight;
     if (freeHeight > 0) {
       const widthMm = strip.widthMm;
@@ -177,16 +216,15 @@ export function buildOffcuts(
     }
   }
 
-  // Right-side remainder of sheet
-  const usedWidth = packed.strips.reduce((max, strip) => {
+  const usedRight = strips.reduce((max, strip) => {
     return Math.max(max, strip.xMm + strip.widthMm);
   }, usable.x);
 
-  const rightWidth = usable.x + usable.width - usedWidth;
+  const rightWidth = usable.x + usable.width - usedRight;
   if (rightWidth > 0) {
     const areaMm2 = rightWidth * usable.height;
     offcuts.push({
-      xMm: usedWidth,
+      xMm: usedRight,
       yMm: usable.y,
       widthMm: rightWidth,
       heightMm: usable.height,
@@ -224,8 +262,6 @@ export function toSheetResult(
     placements: packed.placements.map((part) => ({
       partId: part.partId,
       partInstanceIndex: part.instanceIndex,
-      partName: part.partName,
-      partCode: part.partCode,
       xMm: part.xMm,
       yMm: part.yMm,
       widthMm: part.widthMm,
@@ -235,6 +271,5 @@ export function toSheetResult(
     })),
     operations,
     offcuts,
-    warnings: [],
   };
 }

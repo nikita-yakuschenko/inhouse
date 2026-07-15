@@ -25,7 +25,11 @@ export async function createPartAction(formData: FormData) {
     widthMm: formData.get("widthMm"),
     heightMm: formData.get("heightMm"),
     quantity: formData.get("quantity") || 1,
-    allowRotation: formData.get("allowRotation") === "on",
+    allowRotation:
+      formData.get("allowRotation") === null
+        ? true
+        : formData.get("allowRotation") === "on" ||
+          formData.get("allowRotation") === "true",
   });
 
   if (!parsed.success) {
@@ -48,6 +52,7 @@ export async function createPartAction(formData: FormData) {
       widthMm: parsed.data.widthMm,
       heightMm: parsed.data.heightMm,
       quantity: parsed.data.quantity,
+      // Поворот по умолчанию — иначе раскрой часто остаётся «лёжа» и растёт число резов
       allowRotation: parsed.data.allowRotation ?? true,
       shapeType: "rectangle",
     },

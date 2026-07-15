@@ -291,20 +291,28 @@ export function drawCutMapSheet(
     { borderColor: PDF_COLORS.sheetStroke, borderWidthMm: 2 },
   );
 
-  drawSvgRect(
-    page,
-    engineRectToOperatorSvg(
-      {
-        xMm: sheet.usableXmm,
-        yMm: sheet.usableYmm,
-        widthMm: sheet.usableWidthMm,
-        heightMm: sheet.usableHeightMm,
-      },
-      sheet.heightMm,
-    ),
-    mapper,
-    { borderColor: PDF_COLORS.usableStroke, borderWidthMm: 1.5, dashArray: [8, 5] },
-  );
+  const usableInset =
+    sheet.usableXmm > 0 ||
+    sheet.usableYmm > 0 ||
+    sheet.usableWidthMm < sheet.widthMm ||
+    sheet.usableHeightMm < sheet.heightMm;
+
+  if (usableInset) {
+    drawSvgRect(
+      page,
+      engineRectToOperatorSvg(
+        {
+          xMm: sheet.usableXmm,
+          yMm: sheet.usableYmm,
+          widthMm: sheet.usableWidthMm,
+          heightMm: sheet.usableHeightMm,
+        },
+        sheet.heightMm,
+      ),
+      mapper,
+      { borderColor: PDF_COLORS.usableStroke, borderWidthMm: 1.5, dashArray: [8, 5] },
+    );
+  }
 
   for (const [index, offcut] of sortOffcutsForLabeling(sheet.plannedOffcuts).entries()) {
     const rect = engineRectToOperatorSvg(offcut, sheet.heightMm);

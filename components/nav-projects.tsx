@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { IconDots, IconFolder } from "@tabler/icons-react";
+import { IconDots } from "@tabler/icons-react";
 
+import { ProjectIcon } from "@/components/projects/project-icon";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -37,7 +38,7 @@ export function NavProjects({
           <SidebarMenuItem key={project.id}>
             <SidebarMenuButton asChild>
               <Link href={projectHref(project.id)}>
-                <IconFolder />
+                <ProjectIcon projectId={project.id} className="size-4" />
                 <span>{project.name}</span>
               </Link>
             </SidebarMenuButton>

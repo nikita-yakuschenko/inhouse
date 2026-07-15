@@ -10,7 +10,7 @@ export type OperationsSheetContext = {
   placementLabel: string;
 };
 
-const CUT_OPERATION_TYPES = new Set(["full_cut", "trim_cut"]);
+const CUT_OPERATION_TYPES = new Set(["full_cut"]);
 
 export type OperatorWorkflowStep = {
   id: string;

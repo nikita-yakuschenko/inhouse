@@ -20,6 +20,8 @@ import {
 } from "@tabler/icons-react";
 
 import { DeleteProjectButton } from "@/components/projects/delete-project-button";
+import { EditProjectButton } from "@/components/projects/edit-project-button";
+import { ProjectIcon } from "@/components/projects/project-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,11 +88,16 @@ export function EstimatorCalculationsTable({
         accessorKey: "name",
         header: ({ column }) => <SortableHeader column={column}>Проект</SortableHeader>,
         cell: ({ row }) => (
-          <div className="min-w-48">
-            <p className="font-medium">{row.original.name}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-              {row.original.id}
-            </p>
+          <div className="flex min-w-48 items-start gap-3">
+            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/70">
+              <ProjectIcon projectId={row.original.id} className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-medium">{row.original.name}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                {row.original.id}
+              </p>
+            </div>
           </div>
         ),
       },
@@ -130,7 +137,11 @@ export function EstimatorCalculationsTable({
         id: "actions",
         header: () => <span className="sr-only">Действия</span>,
         cell: ({ row }) => (
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-0.5">
+            <EditProjectButton
+              projectId={row.original.id}
+              projectName={row.original.name}
+            />
             <DeleteProjectButton
               projectId={row.original.id}
               projectName={row.original.name}

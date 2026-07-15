@@ -44,10 +44,11 @@ export function buildEngineInput(params: {
     sheet: {
       widthMm: sheetFormat.widthMm,
       heightMm: sheetFormat.heightMm,
-      trimLeftMm: sheetFormat.trimLeftMm,
-      trimRightMm: sheetFormat.trimRightMm,
-      trimTopMm: sheetFormat.trimTopMm,
-      trimBottomMm: sheetFormat.trimBottomMm,
+      // Заводской лист — рабочая зона на всю заготовку, без технологической подрезки
+      trimLeftMm: 0,
+      trimRightMm: 0,
+      trimTopMm: 0,
+      trimBottomMm: 0,
     },
     parts: [...parts].sort(comparePartsBySpecOrder).map((part) => ({
       id: part.id,

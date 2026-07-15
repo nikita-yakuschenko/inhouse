@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/table";
 
 export function OperationsList({ operations }: { operations: CutOperation[] }) {
-  if (operations.length === 0) {
+  const visibleOperations = operations.filter(
+    (operation) => operation.operationType !== "trim_cut",
+  );
+
+  if (visibleOperations.length === 0) {
     return (
       <div className="px-6 py-8 text-sm text-muted-foreground">
         Операции появятся после расчёта.
@@ -28,7 +32,7 @@ export function OperationsList({ operations }: { operations: CutOperation[] }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {operations.map((operation) => (
+        {visibleOperations.map((operation) => (
           <TableRow key={operation.id}>
             <TableCell className="pl-6">{operation.sequenceNumber}</TableCell>
             <TableCell>{operation.operationType}</TableCell>

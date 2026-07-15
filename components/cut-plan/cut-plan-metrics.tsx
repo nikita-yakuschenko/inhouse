@@ -32,7 +32,7 @@ export function CutPlanMetrics({
         label="Отход"
         value={`${Number(cutPlan.wastePercent ?? 0).toFixed(1)}%`}
       />
-      <MetricCard label="Операций" value={String(cutPlan.totalOperationsCount)} />
+      <MetricCard label="Операций реза" value={String(cutPlan.totalSetupChangesCount)} />
       <MetricCard
         label="Площадь деталей"
         value={`${(Number(cutPlan.totalPartsAreaMm2) / 1_000_000).toFixed(2)} м²`}

@@ -70,6 +70,43 @@ export async function createProjectAction(formData: FormData) {
   }
 }
 
+export async function updateProjectNameAction(projectId: string, name: string) {
+  const idParsed = entityIdSchema.safeParse(projectId);
+  if (!idParsed.success) {
+    return { ok: false as const, error: "Некорректный идентификатор проекта" };
+  }
+
+  const nameParsed = z
+    .string()
+    .trim()
+    .min(1, "Укажите название проекта")
+    .max(120, "Слишком длинное название")
+    .safeParse(name);
+
+  if (!nameParsed.success) {
+    return {
+      ok: false as const,
+      error: nameParsed.error.issues[0]?.message ?? "Некорректное название",
+    };
+  }
+
+  try {
+    const project = await prisma.project.update({
+      where: { id: idParsed.data },
+      data: { name: nameParsed.data },
+      select: { id: true, name: true },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/operator");
+    revalidatePath(`/projects/${project.id}`);
+    return { ok: true as const, name: project.name };
+  } catch (error) {
+    console.error("updateProjectNameAction failed", error);
+    return { ok: false as const, error: "Не удалось сохранить название" };
+  }
+}
+
 export async function deleteProjectAction(projectId: string) {
   const parsed = entityIdSchema.safeParse(projectId);
   if (!parsed.success) {

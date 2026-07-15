@@ -206,7 +206,14 @@ export function buildSheetMapSvg(input: SheetMapSvgInput): string {
       ${fontStyles}
     </defs>
     <rect x="0" y="0" width="${operatorSheet.widthMm}" height="${operatorSheet.heightMm}" fill="#ffffff" stroke="#334155" stroke-width="2" />
-    <rect x="${usableRect.xMm}" y="${usableRect.yMm}" width="${usableRect.widthMm}" height="${usableRect.heightMm}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8 5" />
+    ${
+      input.usableXmm > 0 ||
+      input.usableYmm > 0 ||
+      input.usableWidthMm < input.widthMm ||
+      input.usableHeightMm < input.heightMm
+        ? `<rect x="${usableRect.xMm}" y="${usableRect.yMm}" width="${usableRect.widthMm}" height="${usableRect.heightMm}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8 5" />`
+        : ""
+    }
     ${offcutShapes}
     ${placementShapes}
     ${cutLines}

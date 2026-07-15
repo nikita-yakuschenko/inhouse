@@ -525,16 +525,22 @@ export function SheetCanvas({
               strokeWidth={2}
             />
 
-            <rect
-              x={usableRect.xMm}
-              y={usableRect.yMm}
-              width={usableRect.widthMm}
-              height={usableRect.heightMm}
-              fill="none"
-              stroke="#94a3b8"
-              strokeWidth={1.5}
-              strokeDasharray="8 5"
-            />
+            {/* Пунктир usable — только если зона меньше листа (иначе это и есть «подрезка») */}
+            {(props.usableXmm > 0 ||
+              props.usableYmm > 0 ||
+              props.usableWidthMm < props.widthMm ||
+              props.usableHeightMm < props.heightMm) && (
+              <rect
+                x={usableRect.xMm}
+                y={usableRect.yMm}
+                width={usableRect.widthMm}
+                height={usableRect.heightMm}
+                fill="none"
+                stroke="#94a3b8"
+                strokeWidth={1.5}
+                strokeDasharray="8 5"
+              />
+            )}
 
             {labeledOffcuts.map((offcut, index) => {
               const rect = engineRectToOperatorSvg(offcut, props.heightMm);
@@ -629,9 +635,6 @@ export function SheetCanvas({
                 );
               })}
         </svg>
-        <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
-          Колесо — масштаб · перетаскивание — сдвиг · двойной клик — сброс
-        </p>
       </div>
     </>
   );

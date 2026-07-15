@@ -56,7 +56,7 @@ export type ClientCutPlanSheet = Pick<
 
 export type ClientCutPlan = Pick<
   CutPlan,
-  "id" | "totalSheetsCount" | "totalOperationsCount"
+  "id" | "totalSheetsCount" | "totalOperationsCount" | "totalSetupChangesCount"
 > & {
   wastePercent: number | null;
   sheets: ClientCutPlanSheet[];
@@ -76,6 +76,11 @@ export type ClientPanel = {
 
 export type ClientSheetContext = {
   label: string;
+  materialName: string | null;
+  thicknessMm: number | null;
+  sheetFormatName: string | null;
+  sheetWidthMm: number | null;
+  sheetHeightMm: number | null;
 };
 
 type ProjectWithSheetContext = {
@@ -99,15 +104,23 @@ export function serializeSheetContext(
   const sheetFormat = project.sheetFormat;
   const material = project.material;
 
-  if (sheetFormat) {
-    return { label: withMmSuffix(sheetFormat.name) };
+  if (!sheetFormat && !material) {
+    return null;
   }
 
-  if (material) {
-    return { label: withMmSuffix(material.name) };
-  }
+  const thicknessMm = sheetFormat?.thicknessMm ?? material?.thicknessMm ?? null;
+  const label = sheetFormat
+    ? withMmSuffix(sheetFormat.name)
+    : withMmSuffix(material!.name);
 
-  return null;
+  return {
+    label,
+    materialName: material?.name ?? null,
+    thicknessMm,
+    sheetFormatName: sheetFormat?.name ?? null,
+    sheetWidthMm: sheetFormat?.widthMm ?? null,
+    sheetHeightMm: sheetFormat?.heightMm ?? null,
+  };
 }
 
 type PanelWithRelations = {
@@ -140,6 +153,7 @@ export function serializePanelsForClient(panels: PanelWithRelations[]): ClientPa
       id: cutPlan.id,
       totalSheetsCount: cutPlan.totalSheetsCount,
       totalOperationsCount: cutPlan.totalOperationsCount,
+      totalSetupChangesCount: cutPlan.totalSetupChangesCount,
       wastePercent:
         cutPlan.wastePercent !== null && cutPlan.wastePercent !== undefined
           ? Number(cutPlan.wastePercent)

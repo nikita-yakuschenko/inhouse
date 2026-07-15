@@ -18,10 +18,10 @@ const baseInput: EngineInput = {
   sheet: {
     widthMm: 2500,
     heightMm: 1250,
-    trimLeftMm: 5,
-    trimRightMm: 5,
-    trimTopMm: 5,
-    trimBottomMm: 5,
+    trimLeftMm: 0,
+    trimRightMm: 0,
+    trimTopMm: 0,
+    trimBottomMm: 0,
   },
   parts: [],
   offcuts: [],
@@ -88,7 +88,7 @@ describe("runCuttingEngine", () => {
     });
 
     expect(result.status).toBe("success");
-    // usable 2490x1240, kerf 4 → до 12×6 = 72 на лист → ceil(220/72) = 4
+    // usable 2500x1250, kerf 4 → до 12×6 = 72 на лист → ceil(220/72) = 4
     expect(result.metrics.sheetsCount).toBe(4);
     expect(result.sheets[0]?.placements.length).toBeGreaterThan(1);
     expect(
@@ -96,9 +96,16 @@ describe("runCuttingEngine", () => {
     ).toBe(220);
   });
 
-  it("учитывает kerf и trim в рабочей зоне", () => {
+  it("рабочая зона на весь лист без технологической подрезки", () => {
     const result = runCuttingEngine({
       ...baseInput,
+      sheet: {
+        ...baseInput.sheet,
+        trimLeftMm: 0,
+        trimRightMm: 0,
+        trimTopMm: 0,
+        trimBottomMm: 0,
+      },
       parts: [
         {
           id: "p1",
@@ -115,10 +122,10 @@ describe("runCuttingEngine", () => {
     });
 
     const sheet = result.sheets[0];
-    expect(sheet?.usableXmm).toBe(5);
-    expect(sheet?.usableYmm).toBe(5);
-    expect(sheet?.usableWidthMm).toBe(2490);
-    expect(sheet?.placements[0]?.xMm).toBeGreaterThanOrEqual(5);
+    expect(sheet?.usableXmm).toBe(0);
+    expect(sheet?.usableYmm).toBe(0);
+    expect(sheet?.usableWidthMm).toBe(2500);
+    expect(sheet?.placements[0]?.xMm).toBe(0);
   });
 
   it("возвращает ошибку если деталь не помещается", () => {
@@ -172,4 +179,51 @@ describe("runCuttingEngine", () => {
     expect(result.status).toBe("success");
     expect(result.sheets[0]?.placements[0]?.rotationDeg).toBe(90);
   });
+
+  it("для 3×1200×570 + 5×1150×560 ставит детали вертикально и снижает число резов", () => {
+    const result = runCuttingEngine({
+      ...baseInput,
+      machine: {
+        ...baseInput.machine,
+        preferredPrimaryAxis: "auto",
+      },
+      parts: [
+        {
+          id: "p1",
+          name: "Деталь 1",
+          quantity: 3,
+          widthMm: 1200,
+          heightMm: 570,
+          shapeType: "rectangle",
+          allowRotation: true,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "p2",
+          name: "Деталь 2",
+          quantity: 5,
+          widthMm: 1150,
+          heightMm: 560,
+          shapeType: "rectangle",
+          allowRotation: true,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+      ],
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.metrics.sheetsCount).toBe(2);
+
+    const placements = result.sheets.flatMap((sheet) => sheet.placements);
+    expect(placements).toHaveLength(8);
+    // Узкие вертикальные полосы: ширина ≈ 560/570, высота ≈ 1150/1200
+    expect(placements.every((p) => p.widthMm < p.heightMm)).toBe(true);
+    expect(placements.every((p) => p.rotationDeg === 90)).toBe(true);
+
+    // Полные резы: 11 вместо прежних ~20 при «лежачей» раскладке
+    expect(result.metrics.setupChangesCount).toBe(11);
+  });
 });
+

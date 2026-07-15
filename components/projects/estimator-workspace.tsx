@@ -281,7 +281,7 @@ function CutPlanSummary({ cutPlan }: { cutPlan: ClientCutPlan }) {
         <CardHeader>
           <CardDescription>Операций реза</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums">
-            {cutPlan.totalOperationsCount}
+            {cutPlan.totalSetupChangesCount}
           </CardTitle>
         </CardHeader>
       </Card>

@@ -8,7 +8,7 @@ import type {
 } from "./types";
 import { formatPartLabel } from "./validation";
 
-type AxisMode = "vertical" | "horizontal";
+export type AxisMode = "vertical" | "horizontal";
 
 interface Orientation {
   widthMm: number;
@@ -37,6 +37,14 @@ function getOrientations(part: PartInstance): Orientation[] {
   ];
 }
 
+/** На альбомном листе выгоднее узкие вертикальные полосы — меньше резов и аккуратнее обрезки. */
+function sortOrientationsForNewStrip(orientations: Orientation[]): Orientation[] {
+  return [...orientations].sort((a, b) => {
+    if (a.widthMm !== b.widthMm) return a.widthMm - b.widthMm;
+    return b.heightMm - a.heightMm;
+  });
+}
+
 function createPlacement(
   part: PartInstance,
   orientation: Orientation,
@@ -56,10 +64,10 @@ function createPlacement(
 
 function stripUsedWidth(strips: Strip[], kerfMm: number): number {
   if (strips.length === 0) return 0;
-  return strips.reduce((sum, strip, index) => {
-    const kerf = index > 0 ? kerfMm : 0;
-    return sum + kerf + strip.widthMm;
-  }, 0);
+  // Ширина занятого + kerf перед следующей полосой
+  return (
+    strips.reduce((sum, strip) => sum + strip.widthMm, 0) + strips.length * kerfMm
+  );
 }
 
 function canFitInVerticalStrip(
@@ -157,7 +165,7 @@ function tryPlaceVertical(
     }
   }
 
-  for (const orientation of getOrientations(part)) {
+  for (const orientation of sortOrientationsForNewStrip(getOrientations(part))) {
     const placement = createVerticalStrip(sheet, part, orientation, usable, kerfMm);
     if (placement) {
       sheet.placements.push(placement);
@@ -174,18 +182,19 @@ function tryPlaceHorizontal(
   usable: UsableArea,
   kerfMm: number,
 ): PlacedPart | null {
-  // Horizontal strips: rows from bottom to top
   let rowY = usable.y;
   let rowHeight = 0;
   let rowX = usable.x;
 
   for (const strip of sheet.strips) {
-    rowY = strip.xMm; // reuse xMm as row Y for horizontal mode
-    rowHeight = strip.widthMm; // reuse widthMm as row height
+    rowY = strip.xMm;
+    rowHeight = strip.widthMm;
     rowX = usable.x + strip.heightUsedMm;
   }
 
-  for (const orientation of getOrientations(part)) {
+  const orientations = sortOrientationsForNewStrip(getOrientations(part));
+
+  for (const orientation of orientations) {
     const fitsInRow =
       rowX + orientation.widthMm <= usable.x + usable.width &&
       orientation.heightMm <= (rowHeight || usable.height);
