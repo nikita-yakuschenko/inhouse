@@ -1,9 +1,13 @@
 "use client";
 
-import type { MachineProfile, Material, SheetFormat } from "@/app/generated/prisma/client";
 import { IconPlus } from "@tabler/icons-react";
 
-import { CreateProjectForm } from "@/components/projects/create-project-form";
+import {
+  CreateProjectForm,
+  type CatalogMachineOption,
+  type CatalogMaterialOption,
+  type CatalogSheetFormatOption,
+} from "@/components/projects/create-project-form";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -21,9 +25,9 @@ export function NewCalculationSheet({
   machineProfiles,
 }: {
   labels: { newItem: string; createSubmit: string };
-  materials: Material[];
-  sheetFormats: (SheetFormat & { material: Material })[];
-  machineProfiles: MachineProfile[];
+  materials: CatalogMaterialOption[];
+  sheetFormats: CatalogSheetFormatOption[];
+  machineProfiles: CatalogMachineOption[];
 }) {
   return (
     <Sheet>

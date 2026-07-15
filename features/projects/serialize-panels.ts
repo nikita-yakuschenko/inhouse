@@ -7,37 +7,38 @@ import type {
   PlannedOffcut,
 } from "@/app/generated/prisma/client";
 
-export type ClientPlacement = Pick<
-  Placement,
-  | "id"
-  | "partId"
-  | "partInstanceIndex"
-  | "xMm"
-  | "yMm"
-  | "widthMm"
-  | "heightMm"
-  | "rotationDeg"
-  | "label"
->;
+export type ClientPlacement = {
+  id: string;
+  partId: string;
+  partInstanceIndex: number;
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+  rotationDeg: number;
+  label: string | null;
+};
 
-export type ClientCutOperation = Pick<
-  CutOperation,
-  | "id"
-  | "sequenceNumber"
-  | "operationType"
-  | "axis"
-  | "x1Mm"
-  | "y1Mm"
-  | "x2Mm"
-  | "y2Mm"
-  | "note"
->;
+export type ClientCutOperation = {
+  id: string;
+  sequenceNumber: number;
+  operationType: CutOperation["operationType"];
+  axis: CutOperation["axis"];
+  x1Mm: number | null;
+  y1Mm: number | null;
+  x2Mm: number | null;
+  y2Mm: number | null;
+  note: string | null;
+};
 
-export type ClientPlannedOffcut = Pick<
-  PlannedOffcut,
-  "id" | "xMm" | "yMm" | "widthMm" | "heightMm" | "isUseful"
->;
-
+export type ClientPlannedOffcut = {
+  id: string;
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+  isUseful: boolean;
+};
 export type ClientCutPlanSheet = Pick<
   CutPlanSheet,
   | "id"
@@ -108,6 +109,15 @@ function toMmNumber(
   }
   const parsed = Number(value.toString());
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toClientMm(value: number | { toNumber(): number } | null): number | null {
+  if (value == null) return null;
+  return typeof value === "number" ? value : value.toNumber();
+}
+
+function toClientMmRequired(value: number | { toNumber(): number }): number {
+  return typeof value === "number" ? value : value.toNumber();
 }
 
 function withMmSuffix(name: string): string {
@@ -193,8 +203,8 @@ export function serializePanelsForClient(panels: PanelWithRelations[]): ClientPa
           id: placement.id,
           partId: placement.partId,
           partInstanceIndex: placement.partInstanceIndex,
-          xMm: placement.xMm,
-          yMm: placement.yMm,
+          xMm: toClientMmRequired(placement.xMm),
+          yMm: toClientMmRequired(placement.yMm),
           widthMm: placement.widthMm,
           heightMm: placement.heightMm,
           rotationDeg: placement.rotationDeg,
@@ -205,18 +215,18 @@ export function serializePanelsForClient(panels: PanelWithRelations[]): ClientPa
           sequenceNumber: operation.sequenceNumber,
           operationType: operation.operationType,
           axis: operation.axis,
-          x1Mm: operation.x1Mm,
-          y1Mm: operation.y1Mm,
-          x2Mm: operation.x2Mm,
-          y2Mm: operation.y2Mm,
+          x1Mm: toClientMm(operation.x1Mm),
+          y1Mm: toClientMm(operation.y1Mm),
+          x2Mm: toClientMm(operation.x2Mm),
+          y2Mm: toClientMm(operation.y2Mm),
           note: operation.note,
         })),
         plannedOffcuts: sheet.plannedOffcuts.map((offcut) => ({
           id: offcut.id,
-          xMm: offcut.xMm,
-          yMm: offcut.yMm,
-          widthMm: offcut.widthMm,
-          heightMm: offcut.heightMm,
+          xMm: toClientMmRequired(offcut.xMm),
+          yMm: toClientMmRequired(offcut.yMm),
+          widthMm: toClientMmRequired(offcut.widthMm),
+          heightMm: toClientMmRequired(offcut.heightMm),
           isUseful: offcut.isUseful,
         })),
       })),

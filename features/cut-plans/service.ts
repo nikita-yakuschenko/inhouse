@@ -127,7 +127,7 @@ async function saveCutPlanResult(params: {
               yMm: offcut.yMm,
               widthMm: offcut.widthMm,
               heightMm: offcut.heightMm,
-              areaMm2: BigInt(offcut.areaMm2),
+              areaMm2: BigInt(Math.round(offcut.areaMm2)),
               isUseful: offcut.isUseful,
               status: "planned",
             })),

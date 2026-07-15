@@ -16,9 +16,24 @@ import { requireAppRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
+function formatKerfLabel(value: { toString(): string } | number | string): string {
+  const raw =
+    typeof value === "object" && value !== null && "toString" in value
+      ? value.toString()
+      : String(value);
+  return raw.replace(".", ",");
+}
+
 export default async function EquipmentSettingsPage() {
   await requireAppRole("estimator");
   const machines = await getMachineProfilesForSettings();
+
+  const rows = machines.map((machine) => ({
+    id: machine.id,
+    name: machine.name,
+    isDefault: machine.isDefault,
+    kerfLabel: formatKerfLabel(machine.defaultKerfMm),
+  }));
 
   return (
     <AppPage
@@ -44,7 +59,7 @@ export default async function EquipmentSettingsPage() {
         </div>
 
         <div className="overflow-hidden rounded-xl border bg-card">
-          {machines.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-muted-foreground">
               Оборудования пока нет
             </p>
@@ -60,7 +75,7 @@ export default async function EquipmentSettingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {machines.map((machine) => (
+                {rows.map((machine) => (
                   <TableRow key={machine.id}>
                     <TableCell className="pl-6 font-medium">
                       {machine.name}
@@ -71,14 +86,14 @@ export default async function EquipmentSettingsPage() {
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {String(Number(machine.defaultKerfMm)).replace(".", ",")}
+                      {machine.kerfLabel}
                     </TableCell>
                     <TableCell className="pr-6 text-right">
                       <div className="inline-flex items-center justify-end gap-0.5">
                         <EditMachineButton
                           machineId={machine.id}
                           machineName={machine.name}
-                          kerfMm={Number(machine.defaultKerfMm)}
+                          kerfLabel={machine.kerfLabel}
                         />
                         <DeleteMachineButton
                           machineId={machine.id}

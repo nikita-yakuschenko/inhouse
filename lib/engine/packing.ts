@@ -70,30 +70,81 @@ function stripUsedWidth(strips: Strip[], kerfMm: number): number {
   );
 }
 
-function canFitInVerticalStrip(
+function overlapsWithKerf(
+  a: { xMm: number; yMm: number; widthMm: number; heightMm: number },
+  b: { xMm: number; yMm: number; widthMm: number; heightMm: number },
+  kerfMm: number,
+): boolean {
+  return !(
+    a.xMm + a.widthMm + kerfMm <= b.xMm ||
+    b.xMm + b.widthMm + kerfMm <= a.xMm ||
+    a.yMm + a.heightMm + kerfMm <= b.yMm ||
+    b.yMm + b.heightMm + kerfMm <= a.yMm
+  );
+}
+
+/** Свободный слот внутри полосы (в т.ч. справа от более узких деталей над широкой). */
+function findFreeSlotInStrip(
   strip: Strip,
   orientation: Orientation,
   usable: UsableArea,
   kerfMm: number,
-): boolean {
-  if (orientation.widthMm > strip.widthMm) return false;
-  const kerf = strip.parts.length > 0 ? kerfMm : 0;
-  return strip.heightUsedMm + kerf + orientation.heightMm <= usable.height;
+): { xMm: number; yMm: number; waste: number } | null {
+  const stripRight = strip.xMm + strip.widthMm;
+  const usableTop = usable.y + usable.height;
+
+  const xs = new Set<number>([strip.xMm]);
+  const ys = new Set<number>([usable.y]);
+  for (const part of strip.parts) {
+    xs.add(part.xMm + part.widthMm + kerfMm);
+    ys.add(part.yMm + part.heightMm + kerfMm);
+  }
+
+  let best: { xMm: number; yMm: number; waste: number } | null = null;
+
+  for (const xMm of [...xs].sort((a, b) => a - b)) {
+    for (const yMm of [...ys].sort((a, b) => a - b)) {
+      if (xMm + orientation.widthMm > stripRight + 0.01) continue;
+      if (yMm + orientation.heightMm > usableTop + 0.01) continue;
+
+      const candidate = {
+        xMm,
+        yMm,
+        widthMm: orientation.widthMm,
+        heightMm: orientation.heightMm,
+      };
+      if (strip.parts.some((part) => overlapsWithKerf(candidate, part, kerfMm))) {
+        continue;
+      }
+
+      // Ниже и левее — меньше обрезков; штраф за неиспользуемую площадь слота.
+      const waste =
+        yMm * 1_000_000 +
+        xMm * 1_000 +
+        (stripRight - xMm - orientation.widthMm) +
+        (usableTop - yMm - orientation.heightMm);
+
+      if (!best || waste < best.waste) {
+        best = { xMm, yMm, waste };
+      }
+    }
+  }
+
+  return best;
 }
 
-function placeInVerticalStrip(
+function placeInStripAt(
   strip: Strip,
   part: PartInstance,
   orientation: Orientation,
+  xMm: number,
+  yMm: number,
   usable: UsableArea,
-  kerfMm: number,
 ): PlacedPart {
-  const kerf = strip.parts.length > 0 ? kerfMm : 0;
-  const yMm = usable.y + strip.heightUsedMm + kerf;
-  const placement = createPlacement(part, orientation, strip.xMm, yMm);
+  const placement = createPlacement(part, orientation, xMm, yMm);
   strip.parts.push(placement);
-  strip.heightUsedMm += kerf + orientation.heightMm;
-  strip.widthMm = Math.max(strip.widthMm, orientation.widthMm);
+  strip.heightUsedMm = Math.max(strip.heightUsedMm, yMm + orientation.heightMm - usable.y);
+  strip.widthMm = Math.max(strip.widthMm, xMm + orientation.widthMm - strip.xMm);
   return placement;
 }
 
@@ -115,7 +166,14 @@ function createVerticalStrip(
     parts: [],
   };
 
-  const placement = placeInVerticalStrip(strip, part, orientation, usable, kerfMm);
+  const placement = placeInStripAt(
+    strip,
+    part,
+    orientation,
+    strip.xMm,
+    usable.y,
+    usable,
+  );
   sheet.strips.push(strip);
   return placement;
 }
@@ -126,43 +184,43 @@ function tryPlaceVertical(
   usable: UsableArea,
   kerfMm: number,
 ): PlacedPart | null {
-  let best: { placement: PlacedPart; waste: number } | null = null;
+  let best: {
+    strip: Strip;
+    orientation: Orientation;
+    xMm: number;
+    yMm: number;
+    waste: number;
+  } | null = null;
 
   for (const orientation of getOrientations(part)) {
     for (const strip of sheet.strips) {
-      if (!canFitInVerticalStrip(strip, orientation, usable, kerfMm)) continue;
+      if (orientation.widthMm > strip.widthMm + 0.01) continue;
+      const slot = findFreeSlotInStrip(strip, orientation, usable, kerfMm);
+      if (!slot) continue;
 
-      const kerf = strip.parts.length > 0 ? kerfMm : 0;
-      const remainingHeight =
-        usable.height - strip.heightUsedMm - kerf - orientation.heightMm;
-      const remainingWidth = strip.widthMm - orientation.widthMm;
-      const waste = remainingWidth * usable.height + remainingHeight * strip.widthMm;
-
-      const placement = createPlacement(
-        part,
-        orientation,
-        strip.xMm,
-        usable.y + strip.heightUsedMm + kerf,
-      );
-
-      if (!best || waste < best.waste) {
-        best = { placement, waste };
+      if (!best || slot.waste < best.waste) {
+        best = {
+          strip,
+          orientation,
+          xMm: slot.xMm,
+          yMm: slot.yMm,
+          waste: slot.waste,
+        };
       }
     }
   }
 
   if (best) {
-    const strip = sheet.strips.find((item) => item.xMm === best!.placement.xMm);
-    const orientation = getOrientations(part).find(
-      (item) =>
-        item.widthMm === best!.placement.widthMm &&
-        item.heightMm === best!.placement.heightMm,
+    const placement = placeInStripAt(
+      best.strip,
+      part,
+      best.orientation,
+      best.xMm,
+      best.yMm,
+      usable,
     );
-    if (strip && orientation) {
-      const placement = placeInVerticalStrip(strip, part, orientation, usable, kerfMm);
-      sheet.placements.push(placement);
-      return placement;
-    }
+    sheet.placements.push(placement);
+    return placement;
   }
 
   for (const orientation of sortOrientationsForNewStrip(getOrientations(part))) {

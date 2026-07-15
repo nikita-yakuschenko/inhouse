@@ -38,12 +38,12 @@ const projectDetailInclude = {
     orderBy: { sortOrder: "asc" as const },
     include: {
       parts: {
-        orderBy: [{ code: "asc" }, { createdAt: "asc" }],
+        orderBy: [{ code: "asc" as const }, { createdAt: "asc" as const }],
       },
       cutPlans: panelCutPlanInclude,
     },
   },
-} as const;
+};
 
 export async function getProjectById(projectId: string) {
   const project = await prisma.project.findUnique({
@@ -80,7 +80,38 @@ export async function getCatalogDefaults() {
     }),
   ]);
 
-  return { materials, sheetFormats, machineProfiles };
+  // Decimal нельзя передавать в Client Components — только number/string/plain.
+  return {
+    materials: materials.map((material) => ({
+      ...material,
+      thicknessMm: Number(material.thicknessMm),
+      densityKgM2:
+        material.densityKgM2 == null ? null : Number(material.densityKgM2),
+      pricePerM2: material.pricePerM2 == null ? null : Number(material.pricePerM2),
+    })),
+    sheetFormats: sheetFormats.map((sheet) => ({
+      ...sheet,
+      thicknessMm: Number(sheet.thicknessMm),
+      pricePerSheet:
+        sheet.pricePerSheet == null ? null : Number(sheet.pricePerSheet),
+      material: {
+        ...sheet.material,
+        thicknessMm: Number(sheet.material.thicknessMm),
+        densityKgM2:
+          sheet.material.densityKgM2 == null
+            ? null
+            : Number(sheet.material.densityKgM2),
+        pricePerM2:
+          sheet.material.pricePerM2 == null
+            ? null
+            : Number(sheet.material.pricePerM2),
+      },
+    })),
+    machineProfiles: machineProfiles.map((machine) => ({
+      ...machine,
+      defaultKerfMm: Number(machine.defaultKerfMm),
+    })),
+  };
 }
 
 export async function getOperatorAssignments() {

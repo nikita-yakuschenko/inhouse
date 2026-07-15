@@ -5,6 +5,13 @@ export type MmRect = {
   heightMm: number;
 };
 
+/** Подпись размера: 316.5 → «316,5», целое без дробной части. */
+export function formatMmLabel(valueMm: number): string {
+  const rounded = Math.round(valueMm * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return String(rounded).replace(".", ",");
+}
+
 export type PartLabelText = {
   xMm: number;
   yMm: number;
@@ -295,9 +302,9 @@ export function buildPartLabelLayout(
   partWidthMm: number,
   partHeightMm: number,
 ): PartLabelLayout {
+  const sizeText = `${formatMmLabel(partWidthMm)}×${formatMmLabel(partHeightMm)}`;
   const centerX = rect.xMm + rect.widthMm / 2;
   const centerY = rect.yMm + rect.heightMm / 2;
-  const sizeText = `${partWidthMm}×${partHeightMm}`;
 
   const compactLayout = (): PartLabelLayout => {
     const fitted = buildFittedCenterBlock(rect, marking, sizeText);
@@ -333,8 +340,8 @@ export function buildPartLabelLayout(
     yMm: centerY - centerBadge.heightMm / 2,
   };
 
-  const bottomText = String(Math.round(rect.widthMm));
-  const rightText = String(Math.round(rect.heightMm));
+  const bottomText = formatMmLabel(rect.widthMm);
+  const rightText = formatMmLabel(rect.heightMm);
   const bottomBadgeHeight = LABEL_SIDE_FONT_MM + SIDE_BADGE_PAD_MM * 2;
   const rightLocalBadge = buildSingleLineBadge(rightText, LABEL_SIDE_FONT_MM);
   const rightHorizExtent = rightLocalBadge.heightMm;
@@ -561,7 +568,7 @@ export function buildOffcutLabelLayout(
   sheet: { widthMm: number; heightMm: number },
   canvas: MmRect,
 ): OffcutLabelLayout {
-  const sizeText = `${partWidthMm}×${partHeightMm}`;
+  const sizeText = `${formatMmLabel(partWidthMm)}×${formatMmLabel(partHeightMm)}`;
   const centerX = rect.xMm + rect.widthMm / 2;
   const centerY = rect.yMm + rect.heightMm / 2;
   const compact = buildCenterBlock(centerX, centerY, marking, sizeText);

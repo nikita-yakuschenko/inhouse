@@ -5,11 +5,31 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { createProjectAction } from "@/features/projects/actions";
-import type { MachineProfile, Material, SheetFormat } from "@/app/generated/prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+
+export type CatalogMaterialOption = {
+  id: string;
+  name: string;
+};
+
+export type CatalogSheetFormatOption = {
+  id: string;
+  materialId: string;
+  isDefault: boolean;
+  widthMm: number;
+  heightMm: number;
+  thicknessMm: number;
+  material: { name: string };
+};
+
+export type CatalogMachineOption = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+};
 
 const fieldClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
@@ -33,9 +53,9 @@ export function CreateProjectForm({
   machineProfiles,
   submitLabel = "Создать проект",
 }: {
-  materials: Material[];
-  sheetFormats: (SheetFormat & { material: Material })[];
-  machineProfiles: MachineProfile[];
+  materials: CatalogMaterialOption[];
+  sheetFormats: CatalogSheetFormatOption[];
+  machineProfiles: CatalogMachineOption[];
   submitLabel?: string;
 }) {
   const router = useRouter();

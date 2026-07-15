@@ -222,8 +222,91 @@ describe("runCuttingEngine", () => {
     expect(placements.every((p) => p.widthMm < p.heightMm)).toBe(true);
     expect(placements.every((p) => p.rotationDeg === 90)).toBe(true);
 
-    // Полные резы: 11 вместо прежних ~20 при «лежачей» раскладке
-    expect(result.metrics.setupChangesCount).toBe(11);
+    // Полные резы: меньше, чем при «лежачей» раскладке (~20)
+    expect(result.metrics.setupChangesCount).toBe(9);
+  });
+
+  it("кладёт 580 мм деталь рядом с 550 мм в остаток над широкой, а не на новый лист", () => {
+    const result = runCuttingEngine({
+      ...baseInput,
+      machine: { ...baseInput.machine, kerfMm: 3.5 },
+      sheet: {
+        widthMm: 3000,
+        heightMm: 1250,
+        trimLeftMm: 0,
+        trimRightMm: 0,
+        trimTopMm: 0,
+        trimBottomMm: 0,
+      },
+      parts: [
+        {
+          id: "wide",
+          name: "456 [02]",
+          code: "02",
+          quantity: 1,
+          widthMm: 2680,
+          heightMm: 640,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "p05",
+          name: "456 [05]",
+          code: "05",
+          quantity: 1,
+          widthMm: 785,
+          heightMm: 550,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "p06a",
+          name: "456 [06]",
+          code: "06",
+          quantity: 1,
+          widthMm: 345,
+          heightMm: 490,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "p06b",
+          name: "456 [06]",
+          code: "06",
+          quantity: 1,
+          widthMm: 635,
+          heightMm: 550,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+        {
+          id: "p07",
+          name: "456 [07]",
+          code: "07",
+          quantity: 1,
+          widthMm: 635,
+          heightMm: 580,
+          shapeType: "rectangle",
+          allowRotation: false,
+          grainDirectionRequired: false,
+          priority: 0,
+        },
+      ],
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.metrics.sheetsCount).toBe(1);
+    const labels = result.sheets[0]?.placements.map((p) => p.label) ?? [];
+    expect(labels).toContain("456 [07] - 1");
+    expect(labels).toContain("456 [05] - 1");
   });
 });
 

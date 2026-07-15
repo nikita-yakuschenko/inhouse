@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPencil } from "@tabler/icons-react";
 import { toast } from "sonner";
@@ -23,27 +23,30 @@ import { updateMachineProfileAction } from "@/features/machines/actions";
 export function EditMachineButton({
   machineId,
   machineName,
-  kerfMm,
+  kerfLabel,
 }: {
   machineId: string;
   machineName: string;
-  kerfMm: number;
+  /** Уже отформатированная строка: «3,5» */
+  kerfLabel: string;
 }) {
   const router = useRouter();
+  const nameId = useId();
+  const kerfId = useId();
+  const nameRef = useRef<HTMLInputElement>(null);
+  const kerfRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(machineName);
-  const [kerf, setKerf] = useState(String(kerfMm));
+  const [formKey, setFormKey] = useState(0);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (open) {
-      setName(machineName);
-      setKerf(String(kerfMm));
-    }
-  }, [open, machineName, kerfMm]);
+    if (open) setFormKey((key) => key + 1);
+  }, [open]);
 
   function handleSave() {
-    const nextName = name.trim();
+    const nextName = nameRef.current?.value.trim() ?? "";
+    const kerfRaw = kerfRef.current?.value ?? "";
+
     if (!nextName) {
       toast.error("Укажите название");
       return;
@@ -52,7 +55,7 @@ export function EditMachineButton({
     const formData = new FormData();
     formData.set("id", machineId);
     formData.set("name", nextName);
-    formData.set("defaultKerfMm", kerf.replace(",", "."));
+    formData.set("defaultKerfMm", kerfRaw);
 
     startTransition(async () => {
       const result = await updateMachineProfileAction(formData);
@@ -62,7 +65,9 @@ export function EditMachineButton({
       }
 
       setOpen(false);
-      toast.success("Оборудование обновлено", { description: result.name });
+      toast.success("Оборудование обновлено", {
+        description: `${result.name} · пропил ${result.kerfMm.replace(".", ",")} мм`,
+      });
       router.refresh();
     });
   }
@@ -88,27 +93,30 @@ export function EditMachineButton({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="grid gap-4 py-1">
+        <div key={formKey} className="grid gap-4 py-1">
           <div className="grid gap-2">
-            <Label htmlFor={`edit-name-${machineId}`}>Название</Label>
+            <Label htmlFor={nameId}>Название</Label>
             <Input
-              id={`edit-name-${machineId}`}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              ref={nameRef}
+              id={nameId}
+              name="name"
+              defaultValue={machineName}
               disabled={pending}
               autoFocus
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor={`edit-kerf-${machineId}`}>Ширина пропила, мм</Label>
+            <Label htmlFor={kerfId}>Ширина пропила, мм</Label>
             <Input
-              id={`edit-kerf-${machineId}`}
-              type="number"
-              min={0}
-              step={0.1}
-              value={kerf}
-              onChange={(event) => setKerf(event.target.value)}
+              ref={kerfRef}
+              id={kerfId}
+              name="defaultKerfMm"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              defaultValue={kerfLabel}
               disabled={pending}
+              placeholder="3,5"
             />
           </div>
         </div>

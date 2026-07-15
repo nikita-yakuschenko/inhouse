@@ -3,46 +3,60 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { Prisma } from "@/app/generated/prisma/client";
 import prisma from "@/lib/db/prisma";
 import { generateEntityId } from "@/lib/id";
 import { SEED_IDS } from "@/lib/seed-ids";
 
 const entityIdSchema = z.string().regex(/^[0-9A-Z]{8}$/, "Некорректный идентификатор");
 
-function parseMmNumber(value: FormDataEntryValue | null) {
-  if (typeof value !== "string") return value;
-  return value.trim().replace(",", ".");
+/** «3,5» / «3.5» → Decimal (строковый конструктор, без float). */
+function parseKerfMm(raw: FormDataEntryValue | null): Prisma.Decimal | null {
+  if (raw == null) return null;
+  const text = String(raw).trim().replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(text)) return null;
+  try {
+    const value = new Prisma.Decimal(text);
+    if (value.isNeg() || value.gt(20)) return null;
+    return value;
+  } catch {
+    return null;
+  }
 }
 
-const machineFieldsSchema = z.object({
-  name: z.string().trim().min(1, "Укажите название станка"),
-  defaultKerfMm: z.coerce
-    .number()
-    .min(0, "Пропил не может быть отрицательным")
-    .max(20, "Пропил слишком большой"),
-});
+function formatKerfResult(value: Prisma.Decimal): string {
+  return value.toString();
+}
 
 function revalidateMachinePaths() {
-  revalidatePath("/");
-  revalidatePath("/settings/equipment");
-  revalidatePath("/settings/cutting");
-  revalidatePath("/catalog/machines");
+  try {
+    revalidatePath("/");
+    revalidatePath("/settings/equipment");
+    revalidatePath("/settings/cutting");
+    revalidatePath("/catalog/machines");
+  } catch (error) {
+    console.error("revalidateMachinePaths failed", error);
+  }
 }
 
-export async function createMachineProfileAction(formData: FormData) {
-  const parsed = machineFieldsSchema.safeParse({
-    name: formData.get("name"),
-    defaultKerfMm: parseMmNumber(formData.get("defaultKerfMm")),
-  });
+const nameSchema = z.string().trim().min(1, "Укажите название станка");
 
-  if (!parsed.success) {
+export async function createMachineProfileAction(formData: FormData) {
+  const nameParsed = nameSchema.safeParse(formData.get("name"));
+  const kerfRaw = formData.get("defaultKerfMm");
+  const kerf = parseKerfMm(kerfRaw);
+
+  if (!nameParsed.success) {
+    return { ok: false as const, error: nameParsed.error.issues[0]?.message ?? "Некорректное название" };
+  }
+  if (!kerf) {
     return {
       ok: false as const,
-      error: parsed.error.issues[0]?.message ?? "Некорректные данные оборудования",
+      error: `Укажите ширину пропила числом, например 3,5 (получено: «${String(kerfRaw ?? "")}»)`,
     };
   }
 
-  const { name, defaultKerfMm } = parsed.data;
+  const name = nameParsed.data;
 
   try {
     const existingCount = await prisma.machineProfile.count({
@@ -59,7 +73,7 @@ export async function createMachineProfileAction(formData: FormData) {
         maxSheetWidthMm: 3800,
         maxSheetHeightMm: 2200,
         maxSheetThicknessMm: 60,
-        defaultKerfMm,
+        defaultKerfMm: kerf,
         minSafePartWidthMm: 80,
         minSafePartHeightMm: 80,
         minUsefulOffcutWidthMm: 300,
@@ -72,7 +86,7 @@ export async function createMachineProfileAction(formData: FormData) {
     });
 
     revalidateMachinePaths();
-    return { ok: true as const, id, name };
+    return { ok: true as const, id, name, kerfMm: formatKerfResult(kerf) };
   } catch (error) {
     console.error("createMachineProfileAction failed", error);
     return { ok: false as const, error: "Не удалось добавить оборудование" };
@@ -80,26 +94,32 @@ export async function createMachineProfileAction(formData: FormData) {
 }
 
 export async function updateMachineProfileAction(formData: FormData) {
-  const parsed = machineFieldsSchema
-    .extend({ id: entityIdSchema })
-    .safeParse({
-      id: formData.get("id"),
-      name: formData.get("name"),
-      defaultKerfMm: parseMmNumber(formData.get("defaultKerfMm")),
-    });
+  const idParsed = entityIdSchema.safeParse(formData.get("id"));
+  const nameParsed = nameSchema.safeParse(formData.get("name"));
+  const kerfRaw = formData.get("defaultKerfMm");
+  const kerf = parseKerfMm(kerfRaw);
 
-  if (!parsed.success) {
+  console.info("[updateMachineProfileAction] raw kerf:", JSON.stringify(kerfRaw), "→", kerf?.toString());
+
+  if (!idParsed.success) {
+    return { ok: false as const, error: "Некорректный идентификатор" };
+  }
+  if (!nameParsed.success) {
+    return { ok: false as const, error: nameParsed.error.issues[0]?.message ?? "Некорректное название" };
+  }
+  if (!kerf) {
     return {
       ok: false as const,
-      error: parsed.error.issues[0]?.message ?? "Некорректные параметры станка",
+      error: `Укажите ширину пропила числом, например 3,5 (получено: «${String(kerfRaw ?? "")}»)`,
     };
   }
 
-  const data = parsed.data;
+  const id = idParsed.data;
+  const name = nameParsed.data;
 
   try {
     const existing = await prisma.machineProfile.findUnique({
-      where: { id: data.id },
+      where: { id },
       select: { id: true },
     });
 
@@ -108,15 +128,24 @@ export async function updateMachineProfileAction(formData: FormData) {
     }
 
     await prisma.machineProfile.update({
-      where: { id: data.id },
+      where: { id },
       data: {
-        name: data.name,
-        defaultKerfMm: data.defaultKerfMm,
+        name,
+        defaultKerfMm: kerf,
       },
     });
 
+    const saved = await prisma.machineProfile.findUnique({
+      where: { id },
+      select: { defaultKerfMm: true },
+    });
+
     revalidateMachinePaths();
-    return { ok: true as const, name: data.name };
+    return {
+      ok: true as const,
+      name,
+      kerfMm: formatKerfResult(saved?.defaultKerfMm ?? kerf),
+    };
   } catch (error) {
     console.error("updateMachineProfileAction failed", error);
     return { ok: false as const, error: "Не удалось сохранить оборудование" };

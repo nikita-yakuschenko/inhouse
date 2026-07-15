@@ -11,6 +11,23 @@ services:
       - "55432:5432"
     volumes:
       - cutting_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cutting -d cutting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: cutting-app
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://cutting:cutting@postgres:5432/cutting
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   cutting_pg_data:

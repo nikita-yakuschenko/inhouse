@@ -50,6 +50,105 @@ function getUsedWidth(strips: PackedSheet["strips"], usable: UsableArea): number
   );
 }
 
+/** Точки y, где рез по X пересекает готовую деталь (внутрь её габарита). */
+function blockedYByPlacements(
+  cutX: number,
+  placements: PlacedPart[],
+): Array<{ y1: number; y2: number }> {
+  return placements
+    .filter((part) => part.xMm < cutX && part.xMm + part.widthMm > cutX)
+    .map((part) => ({ y1: part.yMm, y2: part.yMm + part.heightMm }));
+}
+
+/** Свободные отрезки [yStart, yEnd] за вычетом занятых деталями. */
+function freeYIntervals(
+  yStart: number,
+  yEnd: number,
+  blocked: Array<{ y1: number; y2: number }>,
+): Array<{ y1: number; y2: number }> {
+  if (yEnd - yStart <= 0.5) return [];
+
+  const sorted = [...blocked]
+    .map((b) => ({
+      y1: Math.max(yStart, b.y1),
+      y2: Math.min(yEnd, b.y2),
+    }))
+    .filter((b) => b.y2 > b.y1)
+    .sort((a, b) => a.y1 - b.y1);
+
+  const free: Array<{ y1: number; y2: number }> = [];
+  let cursor = yStart;
+
+  for (const block of sorted) {
+    if (block.y1 > cursor + 0.5) {
+      free.push({ y1: cursor, y2: Math.min(block.y1, yEnd) });
+    }
+    cursor = Math.max(cursor, block.y2);
+    if (cursor >= yEnd) break;
+  }
+
+  if (yEnd - cursor > 0.5) {
+    free.push({ y1: cursor, y2: yEnd });
+  }
+
+  return free;
+}
+
+function mergeYIntervals(
+  intervals: Array<{ y1: number; y2: number }>,
+): Array<{ y1: number; y2: number }> {
+  if (intervals.length === 0) return [];
+  const sorted = [...intervals].sort((a, b) => a.y1 - b.y1);
+  const merged: Array<{ y1: number; y2: number }> = [
+    { y1: sorted[0].y1, y2: sorted[0].y2 },
+  ];
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const last = merged[merged.length - 1];
+    const next = sorted[i];
+    if (next.y1 <= last.y2 + 0.5) {
+      last.y2 = Math.max(last.y2, next.y2);
+    } else {
+      merged.push({ y1: next.y1, y2: next.y2 });
+    }
+  }
+
+  return merged;
+}
+
+function intersectYIntervals(
+  left: Array<{ y1: number; y2: number }>,
+  right: Array<{ y1: number; y2: number }>,
+): Array<{ y1: number; y2: number }> {
+  const out: Array<{ y1: number; y2: number }> = [];
+  for (const a of left) {
+    for (const b of right) {
+      const y1 = Math.max(a.y1, b.y1);
+      const y2 = Math.min(a.y2, b.y2);
+      if (y2 - y1 > 0.5) out.push({ y1, y2 });
+    }
+  }
+  return mergeYIntervals(out);
+}
+
+/** Y-диапазоны, где рез реально разделяет детали слева и справа — без пустот. */
+function neededYForVerticalCut(
+  cutX: number,
+  placements: PlacedPart[],
+): Array<{ y1: number; y2: number }> {
+  const left = mergeYIntervals(
+    placements
+      .filter((part) => part.xMm + part.widthMm <= cutX + 0.01)
+      .map((part) => ({ y1: part.yMm, y2: part.yMm + part.heightMm })),
+  );
+  const right = mergeYIntervals(
+    placements
+      .filter((part) => part.xMm >= cutX - 0.01)
+      .map((part) => ({ y1: part.yMm, y2: part.yMm + part.heightMm })),
+  );
+  return intersectYIntervals(left, right);
+}
+
 /** Гильотинная последовательность: отделение остатка, поперечные резы, продольные между полосами. */
 function buildGuillotineCuts(
   placements: PlacedPart[],
@@ -80,7 +179,7 @@ function buildGuillotineCuts(
     });
   }
 
-  // 2. Поперечные резы между деталями внутри полосы.
+  // 2. Поперечные резы между деталями внутри полосы — только по ширине нижней детали.
   for (const strip of strips) {
     for (let i = 0; i < strip.parts.length - 1; i += 1) {
       const part = strip.parts[i];
@@ -89,9 +188,9 @@ function buildGuillotineCuts(
         sequenceNumber: seq++,
         operationType: "full_cut",
         axis: "horizontal",
-        x1Mm: strip.xMm,
+        x1Mm: part.xMm,
         y1Mm: cutY,
-        x2Mm: strip.xMm + strip.widthMm,
+        x2Mm: part.xMm + part.widthMm,
         y2Mm: cutY,
         targetPartId: part.partId,
         note: `Отделение детали ${part.label}`,
@@ -100,14 +199,22 @@ function buildGuillotineCuts(
     }
   }
 
-  // 3. Поперечные резы обрезка сверху — центр пропила между деталью и обрезком.
+  // 3. Поперечные резы обрезка сверху — по фактической ширине верхних деталей полосы.
   const topByY = new Map<number, { x1: number; x2: number }>();
   for (const strip of strips) {
     const top = getStripTop(strip, usable);
     if (top + kerf >= usableTop) continue;
-    const span = topByY.get(top) ?? { x1: strip.xMm, x2: strip.xMm + strip.widthMm };
-    span.x1 = Math.min(span.x1, strip.xMm);
-    span.x2 = Math.max(span.x2, strip.xMm + strip.widthMm);
+
+    const reaching = strip.parts.filter(
+      (part) => Math.abs(part.yMm + part.heightMm - top) < 0.01,
+    );
+    if (reaching.length === 0) continue;
+
+    const x1 = Math.min(...reaching.map((part) => part.xMm));
+    const x2 = Math.max(...reaching.map((part) => part.xMm + part.widthMm));
+    const span = topByY.get(top) ?? { x1, x2 };
+    span.x1 = Math.min(span.x1, x1);
+    span.x2 = Math.max(span.x2, x2);
     topByY.set(top, span);
   }
 
@@ -127,27 +234,38 @@ function buildGuillotineCuts(
     });
   }
 
-  // 4. Продольные резы между полосами — в зоне деталей.
-  const workingHeight = strips.reduce(
-    (max, strip) => Math.max(max, getStripTop(strip, usable)),
-    usable.y,
-  );
-
+  // 4. Продольные резы между полосами — только где слева и справа есть детали.
   for (let i = 1; i < strips.length; i += 1) {
-    const gapStart = strips[i - 1].xMm + strips[i - 1].widthMm;
-    const gapEnd = strips[i].xMm;
-    const x = (gapStart + gapEnd) / 2;
-    ops.push({
-      sequenceNumber: seq++,
-      operationType: "full_cut",
-      axis: "vertical",
-      x1Mm: x,
-      y1Mm: usable.y,
-      x2Mm: x,
-      y2Mm: workingHeight,
-      note: `Разделение полосы ${i}`,
-      riskLevel: "normal",
-    });
+    const left = strips[i - 1];
+    const right = strips[i];
+    const gapStart = left.xMm + left.widthMm;
+    const gapEnd = right.xMm;
+    // Если «ширина полосы» раздута широкой деталью снизу, режем по левому краю правой полосы.
+    const x =
+      gapEnd > gapStart
+        ? (gapStart + gapEnd) / 2
+        : right.xMm - kerf / 2;
+
+    if (x <= usable.x || x >= usable.x + usable.width) continue;
+
+    const needed = neededYForVerticalCut(x, placements);
+    const blocked = blockedYByPlacements(x, placements);
+
+    for (const span of needed) {
+      for (const segment of freeYIntervals(span.y1, span.y2, blocked)) {
+        ops.push({
+          sequenceNumber: seq++,
+          operationType: "full_cut",
+          axis: "vertical",
+          x1Mm: x,
+          y1Mm: segment.y1,
+          x2Mm: x,
+          y2Mm: segment.y2,
+          note: `Разделение полосы ${i}`,
+          riskLevel: "normal",
+        });
+      }
+    }
   }
 
   return ops;
