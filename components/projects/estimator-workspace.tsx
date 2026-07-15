@@ -18,6 +18,7 @@ import {
   getSheetIndexParam,
 } from "@/lib/cut-plan/panel-workspace-state";
 import { getSheetIndicesForPart } from "@/lib/cut-plan/sheet-part-groups";
+import { buildMaterialsSpecSummary } from "@/lib/cut-plan/materials-spec";
 import { totalMaterialSheetsCount } from "@/lib/parts/part-work-type";
 
 const ESTIMATOR_TABS = ["parts", "cut", "spec"] as const;
@@ -37,12 +38,14 @@ function resolveEstimatorTab(value: string | null | undefined): EstimatorTab | n
 export function EstimatorWorkspace({
   projectId,
   projectName,
+  contractNumber = null,
   panels,
   sheetContext,
   initialSheetParam = null,
 }: {
   projectId: string;
   projectName: string;
+  contractNumber?: string | null;
   panels: ClientPanel[];
   sheetContext: ClientSheetContext | null;
   initialSheetParam?: string | null;
@@ -59,6 +62,7 @@ export function EstimatorWorkspace({
         <EstimatorWorkspaceInner
           projectId={projectId}
           projectName={projectName}
+          contractNumber={contractNumber}
           panels={panels}
           sheetContext={sheetContext}
           initialSheetParam={initialSheetParam}
@@ -71,12 +75,14 @@ export function EstimatorWorkspace({
 function EstimatorWorkspaceInner({
   projectId,
   projectName,
+  contractNumber,
   panels,
   sheetContext,
   initialSheetParam,
 }: {
   projectId: string;
   projectName: string;
+  contractNumber: string | null;
   panels: ClientPanel[];
   sheetContext: ClientSheetContext | null;
   initialSheetParam: string | null;
@@ -173,13 +179,15 @@ function EstimatorWorkspaceInner({
     [allParts, cutPlan?.totalSheetsCount, sheetContext],
   );
 
+  const projectTitle = contractNumber
+    ? `${projectName} · ${contractNumber}`
+    : projectName;
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3 lg:px-6">
         <div className="min-w-0">
-          {sheetContext ? (
-            <p className="text-sm font-medium text-foreground">{sheetContext.label}</p>
-          ) : null}
+          <p className="text-sm font-medium text-foreground">{projectTitle}</p>
           <p className="text-xs text-muted-foreground">{allParts.length} дет.</p>
         </div>
 
@@ -201,7 +209,13 @@ function EstimatorWorkspaceInner({
             meta={{
               projectName,
               projectId,
+              contractNumber,
               materialLabel: sheetContext?.label ?? null,
+              materialsSpec: buildMaterialsSpecSummary(
+                sheetContext,
+                allParts,
+                cutPlan,
+              ),
             }}
             panels={panels}
           />

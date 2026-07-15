@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractPanelCode,
+  extractWallMark,
+  countUniqueWallMarks,
   formatPartMarkingLabel,
   resolvePartMarking,
 } from "@/lib/parts/part-marking";
@@ -25,5 +27,21 @@ describe("resolvePartMarking", () => {
 
   it("извлекает код панели", () => {
     expect(extractPanelCode("Плитная обшивка внешняя Ст-1-02")).toBe("Ст-1-02");
+  });
+
+  it("извлекает марку стены из кода детали", () => {
+    expect(extractWallMark("Плита", "Ст-1-02-01")).toBe("Ст-1-02");
+    expect(extractWallMark("Плита Ст-1-03", "04")).toBe("Ст-1-03");
+  });
+
+  it("считает уникальные марки стен", () => {
+    expect(
+      countUniqueWallMarks([
+        { name: "a", code: "Ст-1-01-01" },
+        { name: "b", code: "Ст-1-01-02" },
+        { name: "c", code: "Ст-1-02-01" },
+        { name: "d", code: "Ст-1-02-03" },
+      ]),
+    ).toBe(2);
   });
 });

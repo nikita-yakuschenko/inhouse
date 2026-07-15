@@ -81,7 +81,20 @@ describe("buildCutPlanPdfBytes", () => {
       {
         projectName: "Тестовый расчёт",
         projectId: "pr01",
+        contractNumber: "Д-45/26",
         materialLabel: "ЛДСП 16 мм",
+        materialsSpec: {
+          materialName: "ЛДСП",
+          formatLabel: "2500×1250",
+          thicknessLabel: "16",
+          sheetsCount: 1,
+          sheetsAreaLabel: "3.13 м²",
+          partsAreaLabel: "0.15 м²",
+          wastePercentLabel: "95.2%",
+          markingSheets: 0,
+          cuttingSheets: 1,
+          hasCutPlan: true,
+        },
       },
       collectCutPlanPdfSheets(panels),
     );
@@ -90,7 +103,7 @@ describe("buildCutPlanPdfBytes", () => {
     const pdfDoc = await PDFDocument.load(bytes);
 
     expect(text.startsWith("%PDF-")).toBe(true);
-    expect(pdfDoc.getPageCount()).toBe(1);
+    expect(pdfDoc.getPageCount()).toBe(2);
     const pageSize = pdfDoc.getPage(0)!.getSize();
     expect(pageSize.width).toBeCloseTo((297 * 72) / 25.4, 1);
     expect(pageSize.height).toBeCloseTo((210 * 72) / 25.4, 1);
@@ -144,6 +157,53 @@ describe("buildCutPlanPdfBytes", () => {
 
     const pdfDoc = await PDFDocument.load(bytes);
     expect(pdfDoc.getPageCount()).toBe(3);
+  });
+
+  it("без спецификации — только карты; с договором в мета без ошибки", async () => {
+    const panels: ClientPanel[] = [
+      {
+        id: "pn01",
+        name: "Панель",
+        code: "Ст-1",
+        parts: [],
+        cutPlans: [
+          {
+            id: "cp01",
+            totalSheetsCount: 1,
+            totalOperationsCount: 0,
+            wastePercent: 0,
+            sheets: [
+              {
+                id: "sh1",
+                sheetIndex: 1,
+                widthMm: 2500,
+                heightMm: 1250,
+                usableXmm: 0,
+                usableYmm: 0,
+                usableWidthMm: 2500,
+                usableHeightMm: 1250,
+                placements: [],
+                operations: [],
+                plannedOffcuts: [],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const bytes = await buildCutPlanPdfBytes(
+      {
+        projectName: "456",
+        projectId: "pr03",
+        contractNumber: "Д-1",
+        materialLabel: "Плита",
+      },
+      collectCutPlanPdfSheets(panels),
+    );
+
+    const pdfDoc = await PDFDocument.load(bytes);
+    expect(pdfDoc.getPageCount()).toBe(1);
   });
 });
 

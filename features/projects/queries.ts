@@ -32,7 +32,7 @@ export async function getProjects() {
       panels: {
         orderBy: { sortOrder: "asc" },
         include: {
-          parts: { select: { id: true, quantity: true } },
+          parts: { select: { id: true, name: true, code: true, quantity: true } },
           cutPlans: {
             orderBy: { createdAt: "desc" },
             take: 1,

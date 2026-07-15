@@ -1,4 +1,5 @@
 import type { ProjectStatus } from "@/app/generated/prisma/client";
+import { countUniqueWallMarks } from "@/lib/parts/part-marking";
 import type { ProjectTechnologyValue } from "@/lib/projects/technology";
 
 export type ProjectListRow = {
@@ -21,7 +22,7 @@ type ProjectForList = {
   status: ProjectStatus;
   updatedAt: Date;
   panels: {
-    parts: { quantity: number }[];
+    parts: { name: string; code: string | null; quantity: number }[];
   }[];
 };
 
@@ -35,7 +36,8 @@ export function serializeProjectListRows(projects: ProjectForList[]): ProjectLis
       contractNumber: project.contractNumber,
       technology: project.technology,
       status: project.status,
-      panelsCount: project.panels.length,
+      // Уникальные марки стен из кодов деталей, не число DB-панелей (их теперь 1).
+      panelsCount: countUniqueWallMarks(parts),
       partsCount: parts.length,
       partsQuantity: parts.reduce((sum, part) => sum + part.quantity, 0),
       updatedAt: project.updatedAt.toISOString(),

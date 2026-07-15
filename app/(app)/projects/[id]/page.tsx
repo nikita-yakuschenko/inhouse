@@ -51,6 +51,7 @@ export default async function EstimatorProjectPage({
       <EstimatorWorkspace
         projectId={project.id}
         projectName={project.name}
+        contractNumber={project.contractNumber}
         panels={serializePanelsForClient(project.panels)}
         sheetContext={serializeSheetContext(project)}
         initialSheetParam={query.sheet ?? null}

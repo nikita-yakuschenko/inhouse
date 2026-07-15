@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
 import { entityIdSchema, generateEntityId, generateEntityIds } from "@/lib/id";
+import { countUniqueWallMarks } from "@/lib/parts/part-marking";
 import { parseSpecificationXlsx } from "@/lib/parts/parse-specification-xlsx";
 
 const partSchema = z.object({
@@ -152,7 +153,7 @@ export async function importPartsFromXlsxAction(formData: FormData) {
     return {
       ok: true as const,
       importedCount: importedParts.length,
-      panelsCount: 1,
+      panelsCount: countUniqueWallMarks(importedParts),
     };
   } catch (error) {
     console.error("importPartsFromXlsxAction failed", error);

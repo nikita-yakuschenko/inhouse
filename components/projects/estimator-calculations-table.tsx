@@ -21,7 +21,6 @@ import {
 
 import { DeleteProjectButton } from "@/components/projects/delete-project-button";
 import { EditProjectButton } from "@/components/projects/edit-project-button";
-import { ProjectIcon } from "@/components/projects/project-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,30 +88,28 @@ export function EstimatorCalculationsTable({
         header: ({ column }) => (
           <SortableHeader column={column}>Зав. № домокомплекта</SortableHeader>
         ),
-        cell: ({ row }) => (
-          <div className="flex min-w-48 items-start gap-3">
-            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/70">
-              <ProjectIcon projectId={row.original.id} className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <p className="font-medium">{row.original.name}</p>
+        cell: ({ row }) => {
+          const technologyLabel =
+            row.original.technology === "pkd"
+              ? "ПКД"
+              : row.original.technology === "md"
+                ? "МД"
+                : null;
+          const title = technologyLabel
+            ? `${row.original.name} · ${technologyLabel}`
+            : row.original.name;
+
+          return (
+            <div className="min-w-48">
+              <p className="font-medium">{title}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {[
-                  row.original.contractNumber
-                    ? `Дог. ${row.original.contractNumber}`
-                    : null,
-                  row.original.technology === "pkd"
-                    ? "ПКД"
-                    : row.original.technology === "md"
-                      ? "МД"
-                      : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || row.original.id}
+                {row.original.contractNumber
+                  ? `договор ${row.original.contractNumber}`
+                  : row.original.id}
               </p>
             </div>
-          </div>
-        ),
+          );
+        },
       },
       {
         accessorKey: "panelsCount",
