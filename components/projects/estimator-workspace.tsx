@@ -231,13 +231,32 @@ function EstimatorWorkspaceInner({
         )}
 
         <div className="ml-auto flex flex-wrap items-end justify-end gap-2">
-          <ProjectCuttingSetupSelects
+          <ExportCutPlanPdfButton
+            meta={{
+              projectName,
+              projectId,
+              contractNumber,
+              materialLabel: sheetContext?.label ?? null,
+              sheetWidthMm: sheetContext?.sheetWidthMm ?? null,
+              sheetHeightMm: sheetContext?.sheetHeightMm ?? null,
+              materialsSpec: buildMaterialsSpecSummary(
+                sheetContext,
+                allParts,
+                cutPlan,
+              ),
+            }}
+            panels={panels}
+          />
+          <CalculateProjectButton
             projectId={projectId}
-            sheetFormatId={sheetFormatId}
-            machineProfileId={machineProfileId}
-            hasCutPlan={Boolean(cutPlan)}
-            sheetFormats={sheetFormats}
-            machineProfiles={machineProfiles}
+            disabled={!sheetFormatId || !machineProfileId}
+            disabledReason={
+              !sheetFormatId
+                ? "Сначала выберите материал"
+                : !machineProfileId
+                  ? "Сначала выберите станок"
+                  : undefined
+            }
           />
         </div>
       </div>
@@ -251,35 +270,6 @@ function EstimatorWorkspaceInner({
               <TabsTrigger value="spec">Спецификация</TabsTrigger>
               <TabsTrigger value="params">Параметры раскроя</TabsTrigger>
             </TabsList>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <ExportCutPlanPdfButton
-                meta={{
-                  projectName,
-                  projectId,
-                  contractNumber,
-                  materialLabel: sheetContext?.label ?? null,
-                  sheetWidthMm: sheetContext?.sheetWidthMm ?? null,
-                  sheetHeightMm: sheetContext?.sheetHeightMm ?? null,
-                  materialsSpec: buildMaterialsSpecSummary(
-                    sheetContext,
-                    allParts,
-                    cutPlan,
-                  ),
-                }}
-                panels={panels}
-              />
-              <CalculateProjectButton
-                projectId={projectId}
-                disabled={!sheetFormatId || !machineProfileId}
-                disabledReason={
-                  !sheetFormatId
-                    ? "Сначала выберите материал"
-                    : !machineProfileId
-                      ? "Сначала выберите станок"
-                      : undefined
-                }
-              />
-            </div>
           </div>
 
           <TabsContent value="parts" className="mt-4 min-h-0 flex-1">
@@ -334,6 +324,7 @@ function EstimatorWorkspaceInner({
 
           <TabsContent value="params" className="mt-4 min-h-0 flex-1">
             <SheetCutParamsPanel
+              projectId={projectId}
               sheetContext={sheetContext}
               sheetFormatId={sheetFormatId}
               machineProfileId={machineProfileId}
@@ -387,6 +378,7 @@ function CutPlanSummary({
 }
 
 function SheetCutParamsPanel({
+  projectId,
   sheetContext,
   sheetFormatId,
   machineProfileId,
@@ -395,6 +387,7 @@ function SheetCutParamsPanel({
   cutPlan,
   partsCount,
 }: {
+  projectId: string;
   sheetContext: ClientSheetContext | null;
   sheetFormatId: string | null;
   machineProfileId: string | null;
@@ -403,16 +396,6 @@ function SheetCutParamsPanel({
   cutPlan: ClientCutPlan | null;
   partsCount: number;
 }) {
-  const sheet = sheetFormats.find((item) => item.id === sheetFormatId) ?? null;
-  const machine =
-    machineProfiles.find((item) => item.id === machineProfileId) ?? null;
-
-  const formatLabel = sheet
-    ? `${sheet.widthMm}×${sheet.heightMm}×${Number(sheet.thicknessMm)}`
-    : sheetContext?.sheetWidthMm != null && sheetContext.sheetHeightMm != null
-      ? `${sheetContext.sheetWidthMm}×${sheetContext.sheetHeightMm}`
-      : "—";
-
   return (
     <Card className="shadow-xs">
       <CardHeader>
@@ -422,20 +405,17 @@ function SheetCutParamsPanel({
           в шапке проекта.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>
-          Материал:{" "}
-          <span className="font-medium">
-            {sheetContext?.materialName ?? sheet?.material.name ?? "не выбран"}
-          </span>
-        </p>
-        <p>
-          Формат листа: <span className="tabular-nums font-medium">{formatLabel}</span>
-        </p>
-        <p>
-          Станок:{" "}
-          <span className="font-medium">{machine?.name ?? "не выбран"}</span>
-        </p>
+      <CardContent className="space-y-3 text-sm">
+        {/* Редактирование параметров — только на этой вкладке. */}
+        <ProjectCuttingSetupSelects
+          projectId={projectId}
+          sheetFormatId={sheetFormatId}
+          machineProfileId={machineProfileId}
+          hasCutPlan={Boolean(cutPlan)}
+          sheetFormats={sheetFormats}
+          machineProfiles={machineProfiles}
+        />
+
         <p>
           Деталей в проекте:{" "}
           <span className="tabular-nums font-medium">{partsCount}</span>

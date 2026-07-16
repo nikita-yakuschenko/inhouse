@@ -41,6 +41,7 @@ import {
   type ProjectListRow,
 } from "@/features/projects/serialize-project-list";
 import { PROJECT_STATUS_LABELS } from "@/lib/auth/workspace-labels";
+import { projectKindShortLabel } from "@/lib/projects/project-kind";
 
 function SortableHeader({
   column,
@@ -97,7 +98,7 @@ export function EstimatorCalculationsTable({
           <SortableHeader column={column}>Зав. № домокомплекта</SortableHeader>
         ),
         cell: ({ row }) => {
-          const kindLabel = row.original.kind === "bar" ? "Погонаж" : "Плиты";
+          const kindLabel = projectKindShortLabel(row.original.kind);
           const technologyLabel =
             row.original.technology === "pkd"
               ? "ПКД"

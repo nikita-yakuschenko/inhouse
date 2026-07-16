@@ -424,6 +424,25 @@ export function BarWorkspace({ initial }: { initial: BarWorkspaceSnapshot }) {
         ) : (
           <Badge variant="outline">Раскрой не рассчитан</Badge>
         )}
+        <div className="ml-auto flex flex-wrap items-end justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={!result}
+            onClick={() =>
+              result &&
+              downloadBarCutPlanPdf(
+                result,
+                `${initial.projectName}${initial.contractNumber ? ` · ${initial.contractNumber}` : ""}`,
+              )
+            }
+          >
+            <IconDownload className="size-4" />
+            Скачать PDF
+          </Button>
+          <CutCalculateButton pending={pending} onClick={handleCalculate} />
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-4 lg:p-6">
@@ -441,25 +460,6 @@ export function BarWorkspace({ initial }: { initial: BarWorkspaceSnapshot }) {
               <TabsTrigger value="spec">Спецификация</TabsTrigger>
               <TabsTrigger value="params">Параметры раскроя</TabsTrigger>
             </TabsList>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2"
-                disabled={!result}
-                onClick={() =>
-                  result &&
-                  downloadBarCutPlanPdf(
-                    result,
-                    `${initial.projectName}${initial.contractNumber ? ` · ${initial.contractNumber}` : ""}`,
-                  )
-                }
-              >
-                <IconDownload className="size-4" />
-                Скачать PDF
-              </Button>
-              <CutCalculateButton pending={pending} onClick={handleCalculate} />
-            </div>
           </div>
 
           {(error || importNotice) && (

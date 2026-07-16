@@ -8,6 +8,7 @@ import { createProjectAction } from "@/features/projects/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { projectKindSelectLabel } from "@/lib/projects/project-kind";
 import { cn } from "@/lib/utils";
 
 export type CatalogMaterialOption = {
@@ -96,8 +97,8 @@ export function CreateProjectForm({
           onChange={(e) => setKind(e.target.value as "sheet" | "bar")}
           disabled={pending}
         >
-          <option value="sheet">Плиты (листовой материал)</option>
-          <option value="bar">Погонаж (заготовки и отрезки)</option>
+          <option value="sheet">{projectKindSelectLabel("sheet")}</option>
+          <option value="bar">{projectKindSelectLabel("bar")}</option>
         </select>
       </div>
 
